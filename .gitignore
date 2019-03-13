@@ -1,0 +1,7 @@
+.php_cs.cache
+vendor-bin/**/vendor
+vendor-bin/**/composer.lock
+/vendor/
+/build/
+/tests/output/
+

@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<info>
+    <id>openidconnect</id>
+    <name>OpenId Connect</name>
+    <summary>OpenId Connect Integration</summary>
+    <description>bla bla bla</description>
+    <licence>AGPL</licence>
+    <author>Thomas Müller</author>
+    <version>0.1.0</version>
+    <namespace>OpenIdConnect</namespace>
+    <category>security</category>
+    <website>https://github.com/owncloud/openidconnect</website>
+    <bugs>https://github.com/owncloud/openidconnect/issues</bugs>
+    <repository type="git">https://github.com/owncloud/openidconnect.git</repository>
+    <dependencies>
+        <owncloud min-version="10" max-version="10"/>
+        <php min-version="7.0" />
+    </dependencies>
+    <types>
+        <authentication/>
+    </types>
+    <auth-modules>
+        <module>OCA\OpenIdConnect\OpenIdConnectAuthModule</module>
+    </auth-modules>
+</info>
