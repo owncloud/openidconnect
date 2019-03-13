@@ -30,10 +30,7 @@ branches:
         dismiss_stale_reviews: true
       required_status_checks:
         strict: true
-        contexts: 
-          - continuous-integration/drone/pr
-          - codecov/project 
-          - codecov/patch
+        contexts: ['continuous-integration/drone/pr', 'codecov/project', 'codecov/patch']
 labels:
   - name: 1 - To develop
     color: ededed
