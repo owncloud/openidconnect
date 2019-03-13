@@ -1,7 +1,16 @@
 repository:
   name: openidconnect
   description: OpenId Connect Integration for ownCloud
+  private: true
   has_wiki: false
+  topics: openid, owncloud
+teams:
+  - name: internal-developers
+    permission: push
+  - name: security-alerts
+    permission: push
+  - name: ci
+    permission: admin
 labels:
   - name: 1 - To develop
     color: ededed
