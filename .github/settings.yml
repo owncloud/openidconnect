@@ -19,11 +19,11 @@ teams:
     
 milestones:
   - title: backlog
-    description: Development backlog containing the list of tasks that have been accepted for development. 
-    state: open    
+    description: Development backlog containing the list of tasks that have been accepted for development.
+    state: open
   - title: maybe some day
     description: Contains tasks that have NOT been accepted for development. 
-    state: open    
+    state: open
     
 branches:
   - name: master
