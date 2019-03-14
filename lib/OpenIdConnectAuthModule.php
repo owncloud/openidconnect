@@ -152,7 +152,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		$cache = $this->getCache();
 		$userInfo = $cache->get($bearerToken);
 		if ($userInfo) {
-			return $userInfo['userId'];
+			return $this->manager->get($userInfo['userId']);
 		}
 
 		$openId = $this->getOpenIdConnectClient();
@@ -160,24 +160,21 @@ class OpenIdConnectAuthModule implements IAuthModule {
 			return null;
 		}
 		$openId->setAccessToken($bearerToken);
-		$payload = $openId->getAccessTokenPayload();
-
-		// kopano special integration
-		/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
-		if ($payload->{'kc.identity'}->{'kc.i.un'}) {
-			/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
-			return $payload->{'kc.identity'}->{'kc.i.un'};
-		}
 
 		$userInfo = $openId->requestUserInfo();
 		if ($userInfo === null) {
 			return null;
 		}
 
-		// TODO: add config value
-		// TODO: search in user manager with the email address and return the one match ing user - see login flow controller
-		// for now use 'email'
-		return $userInfo['email'];
+		// TODO: which attribute to take?
+		$user = $this->manager->getByEmail($userInfo->email);
+		if (!$user) {
+			throw new LoginException("User with {$userInfo->email} is not known.");
+		}
+		if (\count($user) !== 1) {
+			throw new LoginException("{$userInfo->email} is not unique.");
+		}
+		return $user[0];
 	}
 
 	/**
