@@ -8,6 +8,7 @@ repository:
   allow_squash_merge: false
   allow_merge_commit: true
   allow_rebase_merge: false
+  
 teams:
   - name: internal-developers
     permission: push
@@ -15,6 +16,7 @@ teams:
     permission: push
   - name: ci
     permission: admin
+    
 milestones:
   - title: backlog
     description: Development backlog containing the list of tasks that have been accepted for development. 
@@ -22,6 +24,7 @@ milestones:
   - title: maybe some day
     description: Contains tasks that have NOT been accepted for development. 
     state: open    
+    
 branches:
   - name: master
     protection:
