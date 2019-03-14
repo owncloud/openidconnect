@@ -28,10 +28,12 @@ use OCA\OpenIdConnect\Client;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\Response;
+use OCP\ILogger;
 use OCP\IRequest;
 use OCP\ISession;
 use OCP\IUserManager;
 use OCP\IUserSession;
+use OCP\Util;
 
 class LoginFlowController extends \OCP\AppFramework\Controller {
 
@@ -51,12 +53,17 @@ class LoginFlowController extends \OCP\AppFramework\Controller {
 	 * @var Client
 	 */
 	private $client;
+	/**
+	 * @var ILogger
+	 */
+	private $logger;
 
 	public function __construct(string $appName,
 								IRequest $request,
 								IUserManager $userManager,
 								IUserSession $userSession,
 								ISession $session,
+								ILogger $logger,
 								Client $client) {
 		parent::__construct($appName, $request);
 
@@ -68,6 +75,7 @@ class LoginFlowController extends \OCP\AppFramework\Controller {
 		$this->userManager = $userManager;
 		$this->userSession = $userSession;
 		$this->client = $client;
+		$this->logger = $logger;
 	}
 
 	/**
@@ -82,6 +90,7 @@ class LoginFlowController extends \OCP\AppFramework\Controller {
 			return new JSONResponse([]);
 		}
 		$wellKonwData = $openid->getWellKnownConfig();
+		return new JSONResponse($wellKonwData);
 	}
 
 	/**
@@ -93,7 +102,7 @@ class LoginFlowController extends \OCP\AppFramework\Controller {
 	 * @throws HintException
 	 * @throws \Jumbojett\OpenIDConnectClientException
 	 */
-	public function redirect() {
+	public function login() {
 		$openid = $this->getOpenIdConnectClient();
 		if (!$openid) {
 			throw new HintException('Configuration issue in openidconnect app');
@@ -136,12 +145,32 @@ class LoginFlowController extends \OCP\AppFramework\Controller {
 	 * @NoAdminRequired
 	 * @PublicPage
 	 * @UseSession
+	 * @param string|null $iss
+	 * @param string|null $sid
+	 * @return Response
 	 */
 	public function logout($iss = null, $sid = null) {
-		// TODO: verify issuer
+		if ($iss === null || $sid === null) {
+			$this->logger->warning("OpenID::logout: missing parameters: iss={$iss} and sid={$sid}", ['app' => 'OpenId']);
+			return new Response();
+		}
+		$openIdConfig = $this->client->getOpenIdConfig();
+		if ($openIdConfig === null) {
+			$this->logger->warning('OpenID::logout: OpenID is not properly configured', ['app' => 'OpenId']);
+			return new Response();
+		}
+		if (isset($openIdConfig['provider-url'])) {
+			if (!Util::isSameDomain($openIdConfig['provider-url'], $iss)) {
+				$this->logger->warning("OpenID::logout: iss {$iss} !== provider-url {$openIdConfig['provider-url']}", ['app' => 'OpenId']);
+				return new Response();
+			}
+		}
+
 		\OC::$server->getMemCacheFactory()
 			->create('oca.openid-connect.sessions')
 			->remove($sid);
+
+		$this->logger->warning("OpenID::logout: session terminated: iss={$iss} and sid={$sid}", ['app' => 'OpenId']);
 
 		$resp = new Response();
 		$resp->setHeaders([

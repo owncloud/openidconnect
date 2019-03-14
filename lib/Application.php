@@ -39,19 +39,35 @@ class Application extends App {
 			throw new \OC\HintException('A real distributed mem cache setup is required');
 		}
 
-		/**
-		 * @var Client $module
-		 */
-		$client = $server->query(Client::class);
-		if ($client->getOpenIdConfig() === null) {
+		$client = $this->getClient();
+		$openIdConfig = $client->getOpenIdConfig();
+		if ($openIdConfig === null) {
 			return;
 		}
 		// register alternative login
+		$loginName = isset($openIdConfig['loginButtonName']) ? $openIdConfig['loginButtonName'] : 'OpenId';
 		\OC_App::registerLogIn([
-			'name' => \ucfirst('OpenId'),
+			'name' => $loginName,
 			'href' => $server->getURLGenerator()->linkToRoute('openidconnect.loginFlow.login'),
 		]);
 		// TODO: if configured perform redirect right away if not logged in ....
+
+		$this->verifySession();
+	}
+
+	private function logout() {
+		$server = $this->getContainer()->getServer();
+
+		$server->getSession()->remove('oca.openid-connect.access-token');
+		$server->getSession()->remove('oca.openid-connect.refresh-token');
+		$server->getUserSession()->logout();
+	}
+
+	/**
+	 * @throws \OC\HintException
+	 */
+	private function verifySession() {
+		$server = $this->getContainer()->getServer();
 
 		// verify open id token/session
 		$sid = $server->getSession()->get('oca.openid-connect.session-id');
@@ -65,45 +81,53 @@ class Application extends App {
 			}
 		}
 
+		$client = $this->getClient();
+		// not configured -> nothing to do ...
+		if ($client->getOpenIdConfig() === null) {
+			return;
+		}
+
 		// verify token as stored in session
 		$accessToken = $server->getSession()->get('oca.openid-connect.access-token');
-		if ($accessToken !== null) {
-			// register logout handler
-			$server->getEventDispatcher()->addListener('‌user.afterlogout', function () use ($client, $accessToken, $server) {
-				// only call if access token is still valid
-				$client->signOut($accessToken,
-					$server->getURLGenerator()->getAbsoluteURL('/'));
-			});
+		if ($accessToken === null) {
+			return;
+		}
+		// register logout handler
+		$server->getEventDispatcher()->addListener('‌user.afterlogout', function () use ($client, $accessToken, $server) {
+			// only call if access token is still valid
+			$client->signOut($accessToken,
+				$server->getURLGenerator()->getAbsoluteURL('/'));
+		});
 
-			// TODO: cache this ...
-			$client->verifyJWTsignature($accessToken);
-			$client->setAccessToken($accessToken);
-			$payload = $client->getAccessTokenPayload();
+		// TODO: cache this ...
+		$client->verifyJWTsignature($accessToken);
+		$client->setAccessToken($accessToken);
+		$payload = $client->getAccessTokenPayload();
 
-			// refresh the tokens
-			$expiring = $payload->exp - \time();
-			if ($expiring < 5*60) {
-				$refreshToken = $server->getSession()->get('oca.openid-connect.access-token');
-				if ($refreshToken) {
-					$response = $client->refreshToken($refreshToken);
-					if ($response->error) {
-						$this->logout();
-						throw new \OC\HintException($response->error_description);
-					}
-					$server->getSession()->set('oca.openid-connect.access-token', $client->getAccessToken());
-					$server->getSession()->set('oca.openid-connect.refresh-token', $client->getRefreshToken());
-				} else {
+		// refresh the tokens
+		/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
+		$expiring = $payload->exp - \time();
+		if ($expiring < 5 * 60) {
+			$refreshToken = $server->getSession()->get('oca.openid-connect.access-token');
+			if ($refreshToken) {
+				$response = $client->refreshToken($refreshToken);
+				if ($response->error) {
 					$this->logout();
+					throw new \OC\HintException($response->error_description);
 				}
+				$server->getSession()->set('oca.openid-connect.access-token', $client->getAccessToken());
+				$server->getSession()->set('oca.openid-connect.refresh-token', $client->getRefreshToken());
+			} else {
+				$this->logout();
 			}
 		}
 	}
 
-	private function logout() {
+	/**
+	 * @return Client
+	 */
+	private function getClient(): Client {
 		$server = $this->getContainer()->getServer();
-
-		$server->getSession()->remove('oca.openid-connect.access-token');
-		$server->getSession()->remove('oca.openid-connect.refresh-token');
-		$server->getUserSession()->logout();
+		return $server->query(Client::class);
 	}
 }
