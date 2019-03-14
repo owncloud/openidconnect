@@ -23,6 +23,7 @@ namespace OCA\OpenIdConnect;
 
 use Jumbojett\OpenIDConnectClient;
 use OCP\IConfig;
+use OCP\ILogger;
 use OCP\ISession;
 use OCP\IURLGenerator;
 
@@ -38,6 +39,10 @@ class Client extends OpenIDConnectClient {
 	 * @var IURLGenerator
 	 */
 	private $generator;
+	/**
+	 * @var ILogger
+	 */
+	private $logger;
 
 	/**
 	 * Client constructor.
@@ -45,12 +50,16 @@ class Client extends OpenIDConnectClient {
 	 * @param IConfig $config
 	 * @param IURLGenerator $generator
 	 * @param ISession $session
+	 * @param ILogger $logger
 	 */
 	public function __construct(IConfig $config,
 								IURLGenerator $generator,
-								ISession $session) {
+								ISession $session,
+								ILogger $logger) {
 		$this->session = $session;
 		$this->config = $config;
+		$this->generator = $generator;
+		$this->logger = $logger;
 
 		$openIdConfig = $this->getOpenIdConfig();
 		if ($openIdConfig === null) {
@@ -67,7 +76,12 @@ class Client extends OpenIDConnectClient {
 			$this->setVerifyHost(false);
 			$this->setVerifyPeer(false);
 		}
-		$this->generator = $generator;
+		// set config parameters in case well known is not supported
+		if (isset($openIdConfig['provider-params'])) {
+			$dump = \json_encode($openIdConfig['provider-params']);
+			$logger->info("Manual configuration of endpoints: {$dump}", ['app' => 'OpenID']);
+			$this->providerConfigParam($openIdConfig['provider-params']);
+		}
 	}
 
 	/**
