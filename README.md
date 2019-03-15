@@ -18,12 +18,37 @@ _loginButtonName_ can be chosen freely depending on the installation.
 <?php
 $CONFIG = [
   'openid-connect' => [
-	  'provider-url' => 'https://idp.example.net',
-	  'client-id' => 'fc9b5c78-ec73-47bf-befc-59d4fe780f6f',
-	  'client-secret' => 'e3e5b04a-3c3c-4f4d-b16c-2a6e9fdd3cd1',
-	  'loginButtonName' => 'OpenId Connect'
+	'provider-url' => 'https://idp.example.net',
+	'client-id' => 'fc9b5c78-ec73-47bf-befc-59d4fe780f6f',
+	'client-secret' => 'e3e5b04a-3c3c-4f4d-b16c-2a6e9fdd3cd1',
+	'loginButtonName' => 'OpenId Connect'
   ]
 ];
+
+```
+
+The above configuration assumes that the OpenId Provider is supporting service discovery.
+If not the endpoint configuration has to be done manually as follows:
+```php
+<?php
+$CONFIG = [
+  'openid-connect' => [
+    'provider-url' => 'https://idp.example.net',
+    'client-id' => 'fc9b5c78-ec73-47bf-befc-59d4fe780f6f',
+    'client-secret' => 'e3e5b04a-3c3c-4f4d-b16c-2a6e9fdd3cd1',
+    'loginButtonName' => 'OpenId Connect',
+    'provider-params' => [
+      'authorization_endpoint' => '...',
+      'token_endpoint' => '...',
+      'token_endpoint_auth_methods_supported' => '...',
+      'userinfo_endpoint' => '...',
+      'registration_endpoint' => '...',
+      'end_session_endpoint' => '...',
+      'jwks_uri' => '...'
+    ]
+  ]
+];
+
 
 ```
 
