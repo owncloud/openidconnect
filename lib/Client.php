@@ -127,6 +127,12 @@ class Client extends OpenIDConnectClient {
 
 	public function authenticate() {
 		$redirectUrl = $this->generator->linkToRouteAbsolute('openidconnect.loginFlow.login');
+
+		$openIdConfig = $this->getOpenIdConfig();
+		if (isset($openIdConfig['redirect-url'])) {
+			$redirectUrl = $openIdConfig['redirect-url'];
+		}
+
 		$this->setRedirectURL($redirectUrl);
 		return parent::authenticate();
 	}
