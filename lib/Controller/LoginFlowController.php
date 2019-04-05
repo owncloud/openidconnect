@@ -25,6 +25,7 @@ use OC\HintException;
 use OC\User\LoginException;
 use OC\User\Session;
 use OCA\OpenIdConnect\Client;
+use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\Response;
@@ -35,7 +36,7 @@ use OCP\IUserManager;
 use OCP\IUserSession;
 use OCP\Util;
 
-class LoginFlowController extends \OCP\AppFramework\Controller {
+class LoginFlowController extends Controller {
 
 	/**
 	 * @var ISession
@@ -89,8 +90,8 @@ class LoginFlowController extends \OCP\AppFramework\Controller {
 		if (!$openid) {
 			return new JSONResponse([]);
 		}
-		$wellKonwData = $openid->getWellKnownConfig();
-		return new JSONResponse($wellKonwData);
+		$wellKnownData = $openid->getWellKnownConfig();
+		return new JSONResponse($wellKnownData);
 	}
 
 	/**
