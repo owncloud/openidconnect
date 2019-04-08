@@ -70,3 +70,43 @@ This is an .htaccess example
 
 Please note that service discovery is not mandatory at the moment since no client is supporting this yet.
 
+### How to setup an IdP for development and test purpose
+
+There are various Open Source IdPs out there. The one with the most features implemented seems to be [panva/node-oidc-provider](https://github.com/panva/node-oidc-provider).
+
+To set it up locally do the following:
+1. Clone panva/node-oidc-provider
+2. yarn install
+3. cd example
+4. Add client config into https://github.com/panva/node-oidc-provider/blob/d47ef0ee05cdf888325eef0902883a9e49899b21/example/support/configuration.js#L84
+    ```
+    module.exports.clients = [
+      {
+        client_id: 'ownCloud',
+        client_secret: 'ownCloud',
+        grant_types: ['refresh_token', 'authorization_code'],
+        redirect_uris: ['http://localhost:8080/index.php/apps/openidconnect/redirect'],
+        frontchannel_logout_uri: 'http://localhost:8080/index.php/apps/openidconnect/logout'
+      }
+    ];
+    ```
+5. Start the IdP via: ```node standalone.js```
+6. Open in browser: http://localhost:3000/.well-known/openid-configuration
+7. ownCloud configuration looks as follows:
+    ```
+    $CONFIG = [
+      'openid-connect' => [
+          'provider-url' => 'http://localhost:3000',
+          'client-id' => 'ownCloud',
+          'client-secret' => 'ownCloud',
+          'loginButtonName' => 'node-oidc-provider',
+          'mode' => 'userid',
+          'search-attribute' => 'sub',
+          'use-token-introspection-endpoint' => true
+      ],
+    ];
+    
+    ```
+8. Clients can now use http://localhost:3000/.well-known/openid-configuration to obtain all information which is necessary
+to initiate the OpenId Connect flow. Use the granted access token in any request to ownCloud within a bearer authentication header.
+9. You can login with any credentials but you need to make sure that the user with the given user id exists. In a real world deployment the users will come from LDAP.
