@@ -65,6 +65,7 @@ class Application extends App {
 
 	/**
 	 * @throws \OC\HintException
+	 * @throws \Jumbojett\OpenIDConnectClientException
 	 */
 	private function verifySession() {
 		$server = $this->getContainer()->getServer();
@@ -99,14 +100,65 @@ class Application extends App {
 				$server->getURLGenerator()->getAbsoluteURL('/'));
 		});
 
-		// TODO: cache this ...
-		$client->verifyJWTsignature($accessToken);
-		$client->setAccessToken($accessToken);
-		$payload = $client->getAccessTokenPayload();
+		// cache access token information
+		$exp = $this->getCache()->get($accessToken);
+		if ($exp !== null) {
+			$this->refreshToken($exp);
+			return;
+		}
 
-		// refresh the tokens
-		/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
-		$expiring = $payload->exp - \time();
+		$client->setAccessToken($accessToken);
+		if ($client->getOpenIdConfig()['use-token-introspection-endpoint']) {
+			$introspectionClientId = isset($client->getOpenIdConfig()['token-introspection-endpoint-client-id']) ? $client->getOpenIdConfig()['token-introspection-endpoint-client-id'] : null;
+			$introspectionClientSecret = isset($client->getOpenIdConfig()['token-introspection-endpoint-client-secret']) ? $client->getOpenIdConfig()['token-introspection-endpoint-client-secret'] : null;
+
+			$introData = $client->introspectToken($accessToken, '', $introspectionClientId, $introspectionClientSecret);
+			\OC::$server->getLogger()->debug('Introspection info: ' . \json_encode($introData));
+			if (\property_exists($introData, 'error')) {
+				$this->logout();
+				\OC::$server->getLogger()->error('Token introspection failed: ' . \json_encode($introData));
+				throw new \OC\HintException("Verifying token failed: {$introData->error}");
+			}
+			if (!$introData->active) {
+				$this->logout();
+				return;
+			}
+
+			$this->getCache()->set($accessToken, $introData->exp);
+			$this->refreshToken($introData->exp);
+		} else {
+			$client->verifyJWTsignature($accessToken);
+			$payload = $client->getAccessTokenPayload();
+			\OC::$server->getLogger()->debug('Access token payload: ' . \json_encode($payload));
+
+			$this->getCache()->set($accessToken, $payload->exp);
+			/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
+			$this->refreshToken($payload->exp);
+		}
+	}
+
+	/**
+	 * @return Client
+	 */
+	private function getClient(): Client {
+		$server = $this->getContainer()->getServer();
+		return $server->query(Client::class);
+	}
+
+	private function getCache(): \OCP\ICache {
+		return $this->getContainer()->getServer()->getMemCacheFactory()->create('oca.openid-connect');
+	}
+
+	/**
+	 * @param int $exp
+	 * @throws \Jumbojett\OpenIDConnectClientException
+	 * @throws \OC\HintException
+	 */
+	private function refreshToken($exp) {
+		$server = $this->getContainer()->getServer();
+		$client = $this->getClient();
+
+		$expiring = $exp - \time();
 		if ($expiring < 5 * 60) {
 			$refreshToken = $server->getSession()->get('oca.openid-connect.access-token');
 			if ($refreshToken) {
@@ -121,13 +173,5 @@ class Application extends App {
 				$this->logout();
 			}
 		}
-	}
-
-	/**
-	 * @return Client
-	 */
-	private function getClient(): Client {
-		$server = $this->getContainer()->getServer();
-		return $server->query(Client::class);
 	}
 }

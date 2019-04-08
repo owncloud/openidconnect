@@ -118,7 +118,9 @@ class LoginFlowController extends Controller {
 		$user = $this->lookupUser($userInfo);
 
 		// trigger login process
-		if ($this->userSession->loginUser($user, '')) {
+
+		if ($this->userSession->createSessionToken($this->request, $user->getUID(), $user->getUID()) &&
+			$this->userSession->loginUser($user, '')) {
 			$this->session->set('oca.openid-connect.access-token', $openid->getAccessToken());
 			$this->session->set('oca.openid-connect.refresh-token', $openid->getRefreshToken());
 			/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
