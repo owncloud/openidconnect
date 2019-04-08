@@ -70,7 +70,11 @@ class Client extends OpenIDConnectClient {
 			$openIdConfig['client-id'],
 			$openIdConfig['client-secret']
 		);
-		$this->addScope(['openid', 'profile', 'email']);
+		$scopes = ['openid', 'profile', 'email'];
+		if (isset($openIdConfig['scopes'])) {
+			$scopes = $openIdConfig['scopes'];
+		}
+		$this->addScope($scopes);
 
 		if ($this->config->getSystemValue('debug', false)) {
 			$this->setVerifyHost(false);

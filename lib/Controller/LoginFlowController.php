@@ -109,22 +109,16 @@ class LoginFlowController extends Controller {
 			throw new HintException('Configuration issue in openidconnect app');
 		}
 		$openid->authenticate();
+		$this->logger->debug('Access token: ' . $openid->getAccessToken());
 		$userInfo = $openid->requestUserInfo();
+		$this->logger->debug('User info: ' . \json_encode($userInfo));
 		if (!$userInfo) {
 			throw new LoginException('No user information available.');
 		}
-
-		// TODO: which attribute to take?
-		$user = $this->userManager->getByEmail($userInfo->email);
-		if (!$user) {
-			throw new LoginException("User with {$userInfo->email} is not known.");
-		}
-		if (\count($user) !== 1) {
-			throw new LoginException("{$userInfo->email} is not unique.");
-		}
+		$user = $this->lookupUser($userInfo);
 
 		// trigger login process
-		if ($this->userSession->loginUser($user[0], '')) {
+		if ($this->userSession->loginUser($user, '')) {
 			$this->session->set('oca.openid-connect.access-token', $openid->getAccessToken());
 			$this->session->set('oca.openid-connect.refresh-token', $openid->getRefreshToken());
 			/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
@@ -196,5 +190,38 @@ class LoginFlowController extends Controller {
 			return null;
 		}
 		return $this->client;
+	}
+
+	/**
+	 * @param mixed $userInfo
+	 * @return \OCP\IUser
+	 * @throws LoginException
+	 */
+	private function lookupUser($userInfo) {
+		$openIdConfig = $this->client->getOpenIdConfig();
+		$searchByEmail = true;
+		if (isset($openIdConfig['mode']) && $openIdConfig['mode'] === 'userid') {
+			$searchByEmail = false;
+		}
+		$attribute = 'email';
+		if (isset($openIdConfig['search-attribute'])) {
+			$attribute = $openIdConfig['search-attribute'];
+		}
+
+		if ($searchByEmail) {
+			$user = $this->userManager->getByEmail($userInfo->$attribute);
+			if (!$user) {
+				throw new LoginException("User with {$userInfo->$attribute} is not known.");
+			}
+			if (\count($user) !== 1) {
+				throw new LoginException("{$userInfo->$attribute} is not unique.");
+			}
+			return $user[0];
+		}
+		$user = $this->userManager->get($userInfo->$attribute);
+		if (!$user) {
+			throw new LoginException("User {$userInfo->$attribute} is not known.");
+		}
+		return $user;
 	}
 }
