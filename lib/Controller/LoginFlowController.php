@@ -110,6 +110,7 @@ class LoginFlowController extends Controller {
 		}
 		$openid->authenticate();
 		$this->logger->debug('Access token: ' . $openid->getAccessToken());
+		$this->logger->debug('Refresh token: ' . $openid->getRefreshToken());
 		$userInfo = $openid->requestUserInfo();
 		$this->logger->debug('User info: ' . \json_encode($userInfo));
 		if (!$userInfo) {
@@ -120,9 +121,10 @@ class LoginFlowController extends Controller {
 		// trigger login process
 
 		if ($this->userSession->createSessionToken($this->request, $user->getUID(), $user->getUID()) &&
-			$this->userSession->loginUser($user, '')) {
+			$this->userSession->loginUser($user, null)) {
 			$this->session->set('oca.openid-connect.access-token', $openid->getAccessToken());
 			$this->session->set('oca.openid-connect.refresh-token', $openid->getRefreshToken());
+
 			/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
 			if (isset($openid->getIdTokenPayload()->sid)) {
 				/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
@@ -131,6 +133,8 @@ class LoginFlowController extends Controller {
 				\OC::$server->getMemCacheFactory()
 					->create('oca.openid-connect.sessions')
 					->set($sid, true);
+			} else {
+				\OC::$server->getLogger()->debug('Id token holds no sid: ' . \json_encode($openid->getIdTokenPayload()));
 			}
 			return new RedirectResponse($this->getDefaultUrl());
 		}

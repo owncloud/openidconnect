@@ -23,6 +23,7 @@ namespace OCA\OpenIdConnect;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
+use Jumbojett\OpenIDConnectClientException;
 use OCP\AppFramework\App;
 
 class Application extends App {
@@ -77,6 +78,7 @@ class Application extends App {
 				->create('oca.openid-connect.sessions')
 				->get($sid);
 			if (!$sessionValid) {
+				\OC::$server->getLogger()->debug("Session $sid is no longer valid -> logout");
 				$this->logout();
 				return;
 			}
@@ -96,8 +98,13 @@ class Application extends App {
 		// register logout handler
 		$server->getEventDispatcher()->addListener('‌user.afterlogout', function () use ($client, $accessToken, $server) {
 			// only call if access token is still valid
-			$client->signOut($accessToken,
-				$server->getURLGenerator()->getAbsoluteURL('/'));
+			try {
+				\OC::$server->getLogger()->debug('OIDC Logout: ' . $accessToken);
+				$client->signOut($accessToken,
+					$server->getURLGenerator()->getAbsoluteURL('/'));
+			} catch (OpenIDConnectClientException $ex) {
+				\OC::$server->getLogger()->logException($ex);
+			}
 		});
 
 		// cache access token information
@@ -115,11 +122,12 @@ class Application extends App {
 			$introData = $client->introspectToken($accessToken, '', $introspectionClientId, $introspectionClientSecret);
 			\OC::$server->getLogger()->debug('Introspection info: ' . \json_encode($introData));
 			if (\property_exists($introData, 'error')) {
-				$this->logout();
 				\OC::$server->getLogger()->error('Token introspection failed: ' . \json_encode($introData));
+				$this->logout();
 				throw new \OC\HintException("Verifying token failed: {$introData->error}");
 			}
 			if (!$introData->active) {
+				\OC::$server->getLogger()->error('Token (as per introspection) is inactive: ' . \json_encode($introData));
 				$this->logout();
 				return;
 			}
@@ -160,16 +168,18 @@ class Application extends App {
 
 		$expiring = $exp - \time();
 		if ($expiring < 5 * 60) {
-			$refreshToken = $server->getSession()->get('oca.openid-connect.access-token');
+			$refreshToken = $server->getSession()->get('oca.openid-connect.refresh-token');
 			if ($refreshToken) {
 				$response = $client->refreshToken($refreshToken);
 				if ($response->error) {
+					\OC::$server->getLogger()->error("Refresh token failed: {$response->error_description}");
 					$this->logout();
 					throw new \OC\HintException($response->error_description);
 				}
 				$server->getSession()->set('oca.openid-connect.access-token', $client->getAccessToken());
 				$server->getSession()->set('oca.openid-connect.refresh-token', $client->getRefreshToken());
 			} else {
+				\OC::$server->getLogger()->debug('No refresh token available -> logout');
 				$this->logout();
 			}
 		}
