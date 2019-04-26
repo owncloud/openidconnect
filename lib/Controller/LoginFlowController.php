@@ -151,13 +151,23 @@ class LoginFlowController extends Controller {
 	 * @return Response
 	 */
 	public function logout($iss = null, $sid = null) {
-		if ($iss === null || $sid === null) {
-			$this->logger->warning("OpenID::logout: missing parameters: iss={$iss} and sid={$sid}", ['app' => 'OpenId']);
-			return new Response();
-		}
+		// fail fast if not configured
 		$openIdConfig = $this->client->getOpenIdConfig();
 		if ($openIdConfig === null) {
 			$this->logger->warning('OpenID::logout: OpenID is not properly configured', ['app' => 'OpenId']);
+			return new Response();
+		}
+		// there is an active session -> logout
+		if ($this->userSession->isLoggedIn()) {
+			$this->logger->debug('OpenID::logout: There is an active session -> performing logout', ['app' => 'OpenId']);
+			// complete logout
+			$this->session->set('oca.openid-connect.within-logout', true);
+			$this->userSession->logout();
+		}
+		if ($iss === null || $sid === null) {
+			if (!$this->userSession->isLoggedIn()) {
+				$this->logger->warning("OpenID::logout: missing parameters: iss={$iss} and sid={$sid} and no active session", ['app' => 'OpenId']);
+			}
 			return new Response();
 		}
 		if (isset($openIdConfig['provider-url'])) {

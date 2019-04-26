@@ -4,15 +4,15 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7115b7e1913c2fdb7a4e9e421840ff26",
+    "content-hash": "5c6c466ea8972aae9851a21e7e9d9378",
     "packages": [
         {
             "name": "jumbojett/openid-connect-php",
-            "version": "dev-master",
+            "version": "dev-feature/rfc7009",
             "source": {
                 "type": "git",
-                "url": "https://github.com/jumbojett/OpenID-Connect-PHP.git",
-                "reference": "6f23fbb2bbfe29fb3eff4900d684b9eb164333ac"
+                "url": "https://github.com/DeepDiver1975/OpenID-Connect-PHP.git",
+                "reference": "2277717777448709d37c9ae2fc10ed488ed9d87b"
             },
             "archive": {
                 "exclude": [
@@ -35,7 +35,7 @@
                 "Apache-2.0"
             ],
             "description": "Bare-bones OpenID Connect client",
-            "time": "2019-04-15T09:37:37+00:00"
+            "time": "2019-04-26T11:44:25+00:00"
         },
         {
             "name": "phpseclib/phpseclib",
