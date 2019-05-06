@@ -52,6 +52,17 @@ class Application extends App {
 			'href' => $server->getURLGenerator()->linkToRoute('openidconnect.loginFlow.login'),
 		]);
 		// TODO: if configured perform redirect right away if not logged in ....
+		if (isset($openIdConfig['autoRedirectOnLoginPage']) && $openIdConfig['autoRedirectOnLoginPage'] === true) {
+			if (!$server->getUserSession()->isLoggedIn()) {
+				$components = \parse_url($server->getRequest()->getRequestUri());
+				$uri = $components['path'];
+				if (\substr($uri, -6) === '/login') {
+					$loginUrl =  $server->getURLGenerator()->linkToRoute('openidconnect.loginFlow.login');
+					header('Location: ' . $loginUrl);
+					exit;
+				}
+			}
+		}
 
 		$this->verifySession();
 	}
