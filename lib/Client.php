@@ -86,6 +86,10 @@ class Client extends OpenIDConnectClient {
 			$logger->info("Manual configuration of endpoints: {$dump}", ['app' => 'OpenID']);
 			$this->providerConfigParam($openIdConfig['provider-params']);
 		}
+		// set additional auth parameters
+		if (isset($openIdConfig['auth-params'])) {
+			$this->addAuthParam($openIdConfig['auth-params']);
+		}
 	}
 
 	/**

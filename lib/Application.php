@@ -58,7 +58,7 @@ class Application extends App {
 				$uri = $components['path'];
 				if (\substr($uri, -6) === '/login') {
 					$loginUrl =  $server->getURLGenerator()->linkToRoute('openidconnect.loginFlow.login');
-					header('Location: ' . $loginUrl);
+					\header('Location: ' . $loginUrl);
 					exit;
 				}
 			}
