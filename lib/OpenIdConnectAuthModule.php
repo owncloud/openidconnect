@@ -24,6 +24,7 @@ namespace OCA\OpenIdConnect;
 use Jumbojett\OpenIDConnectClient;
 use Jumbojett\OpenIDConnectClientException;
 use OC\User\LoginException;
+use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\Authentication\IAuthModule;
 use OCP\ICacheFactory;
 use OCP\ILogger;
@@ -48,6 +49,8 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	private $cacheFactory;
 	/** @var Client */
 	private $client;
+	/** @var UserLookupService */
+	private $lookupService;
 
 	/**
 	 * OpenIdConnectAuthModule constructor.
@@ -55,16 +58,19 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	 * @param IUserManager $manager
 	 * @param ILogger $logger
 	 * @param ICacheFactory $cacheFactory
+	 * @param UserLookupService $lookupService
 	 * @param Client $client
 	 */
 	public function __construct(IUserManager $manager,
 								   ILogger $logger,
 								   ICacheFactory $cacheFactory,
+								   UserLookupService $lookupService,
 								   Client $client) {
 		$this->manager = $manager;
 		$this->logger = $logger;
 		$this->cacheFactory = $cacheFactory;
 		$this->client = $client;
+		$this->lookupService = $lookupService;
 	}
 
 	/**
@@ -76,30 +82,31 @@ class OpenIdConnectAuthModule implements IAuthModule {
 			return null;
 		}
 		$bearerToken = \substr($authHeader, 7);
+		return $this->authToken($bearerToken);
+	}
+
+	public function authToken(string $bearerToken) {
 		try {
-			$openId = $this->getOpenIdConnectClient();
-			if (!$openId) {
+			if ($this->client->getOpenIdConfig() === null) {
 				return null;
 			}
 			// 1. verify JWT signature
-			$this->verifyJWT($bearerToken);
+			$expiry = $this->verifyJWT($bearerToken);
 
 			// 2. verify expiry
-			$payload = $openId->getAccessTokenPayload();
-			/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
-			$expiring = $payload->exp - \time();
-			if ($expiring < 0) {
-				throw new LoginException('OpenID Connect token expired');
+			if ($expiry) {
+				$expiring = $expiry - \time();
+				if ($expiring < 0) {
+					throw new LoginException('OpenID Connect token expired');
+				}
 			}
 
-			// 3. get user id
-			$userIdentifier = $this->getUserResource($bearerToken);
-			$user = $this->manager->get($userIdentifier);
+			// 3. get user
+			$user = $this->getUserResource($bearerToken);
 			if ($user) {
-				$this->updateCache($bearerToken, $user);
+				$this->updateCache($bearerToken, $user, $expiry);
 				return $user;
 			}
-			// TODO: log something and maybe throw an exception
 			return null;
 		} catch (OpenIDConnectClientException $ex) {
 			$this->logger->logException($ex, ['app' => __CLASS__]);
@@ -115,16 +122,6 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	}
 
 	/**
-	 * @return OpenIDConnectClient|null
-	 */
-	public function getOpenIdConnectClient() {
-		if ($this->client->getOpenIdConfig() === null) {
-			return null;
-		}
-		return $this->client;
-	}
-
-	/**
 	 * @param string $bearerToken
 	 * @throws OpenIDConnectClientException
 	 */
@@ -132,12 +129,29 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		$cache = $this->getCache();
 		$userInfo = $cache->get($bearerToken);
 		if ($userInfo) {
-			return;
+			return $userInfo['exp'];
 		}
-		$openId = $this->getOpenIdConnectClient();
-		if ($openId) {
-			$openId->verifyJWTsignature($bearerToken);
+		if ($this->client->getOpenIdConfig()['use-token-introspection-endpoint']) {
+			$introspectionClientId = isset($this->client->getOpenIdConfig()['token-introspection-endpoint-client-id']) ? $this->client->getOpenIdConfig()['token-introspection-endpoint-client-id'] : null;
+			$introspectionClientSecret = isset($this->client->getOpenIdConfig()['token-introspection-endpoint-client-secret']) ? $this->client->getOpenIdConfig()['token-introspection-endpoint-client-secret'] : null;
+
+			$introData = $this->client->introspectToken($bearerToken, '', $introspectionClientId, $introspectionClientSecret);
+			$this->logger->debug('Introspection info: ' . \json_encode($introData));
+			if (\property_exists($introData, 'error')) {
+				$this->logger->error('Token introspection failed: ' . \json_encode($introData));
+				throw new OpenIDConnectClientException("Verifying token failed: {$introData->error}");
+			}
+			if (!$introData->active) {
+				$this->logger->error('Token (as per introspection) is inactive: ' . \json_encode($introData));
+				throw new OpenIDConnectClientException('Token (as per introspection) is inactive');
+			}
+			return $introData->exp;
 		}
+		$this->client->verifyJWTsignature($bearerToken);
+		$payload = $this->client->getAccessTokenPayload();
+		$this->logger->debug('Access token payload: ' . \json_encode($payload));
+		/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
+		return $payload->exp;
 	}
 
 	/**
@@ -148,43 +162,33 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	}
 
 	private function getUserResource($bearerToken) {
-		// TODO: hide caching in client class
 		$cache = $this->getCache();
 		$userInfo = $cache->get($bearerToken);
 		if ($userInfo) {
-			return $this->manager->get($userInfo['userId']);
+			return $this->manager->get($userInfo['uid']);
 		}
 
-		$openId = $this->getOpenIdConnectClient();
-		if (!$openId) {
-			return null;
-		}
-		$openId->setAccessToken($bearerToken);
+		$this->client->setAccessToken($bearerToken);
 
-		$userInfo = $openId->requestUserInfo();
+		$userInfo = $this->client->requestUserInfo();
+		$this->logger->debug('User info: ' . \json_encode($userInfo));
 		if ($userInfo === null) {
 			return null;
 		}
 
-		// TODO: which attribute to take?
-		$user = $this->manager->getByEmail($userInfo->email);
-		if (!$user) {
-			throw new LoginException("User with {$userInfo->email} is not known.");
-		}
-		if (\count($user) !== 1) {
-			throw new LoginException("{$userInfo->email} is not unique.");
-		}
-		return $user[0];
+		return $this->lookupService->lookupUser($userInfo);
 	}
 
 	/**
 	 * @param string $bearerToken
 	 * @param IUser $user
+	 * @param int $expiry
 	 */
-	private function updateCache($bearerToken, IUser $user) {
+	private function updateCache($bearerToken, IUser $user, $expiry) {
 		$cache = $this->getCache();
 		$cache->set($bearerToken, [
-			'uid' => $user->getUID()
+			'uid' => $user->getUID(),
+			'exp' => $expiry
 		]);
 	}
 }

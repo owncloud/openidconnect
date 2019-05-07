@@ -25,6 +25,7 @@ use OC\HintException;
 use OC\User\LoginException;
 use OC\User\Session;
 use OCA\OpenIdConnect\Client;
+use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\RedirectResponse;
@@ -32,7 +33,6 @@ use OCP\AppFramework\Http\Response;
 use OCP\ILogger;
 use OCP\IRequest;
 use OCP\ISession;
-use OCP\IUserManager;
 use OCP\IUserSession;
 use OCP\Util;
 
@@ -43,9 +43,9 @@ class LoginFlowController extends Controller {
 	 */
 	private $session;
 	/**
-	 * @var IUserManager
+	 * @var UserLookupService
 	 */
-	private $userManager;
+	private $userLookup;
 	/**
 	 * @var Session
 	 */
@@ -61,7 +61,7 @@ class LoginFlowController extends Controller {
 
 	public function __construct(string $appName,
 								IRequest $request,
-								IUserManager $userManager,
+								UserLookupService $userLookup,
 								IUserSession $userSession,
 								ISession $session,
 								ILogger $logger,
@@ -73,7 +73,7 @@ class LoginFlowController extends Controller {
 		}
 
 		$this->session = $session;
-		$this->userManager = $userManager;
+		$this->userLookup = $userLookup;
 		$this->userSession = $userSession;
 		$this->client = $client;
 		$this->logger = $logger;
@@ -83,7 +83,7 @@ class LoginFlowController extends Controller {
 	 * @NoCSRFRequired
 	 * @NoAdminRequired
 	 * @PublicPage
-	 * @UseSession
+	 * @CORS
 	 */
 	public function config() {
 		$openid = $this->getOpenIdConnectClient();
@@ -116,7 +116,7 @@ class LoginFlowController extends Controller {
 		if (!$userInfo) {
 			throw new LoginException('No user information available.');
 		}
-		$user = $this->lookupUser($userInfo);
+		$user = $this->userLookup->lookupUser($userInfo);
 
 		// trigger login process
 
@@ -206,38 +206,5 @@ class LoginFlowController extends Controller {
 			return null;
 		}
 		return $this->client;
-	}
-
-	/**
-	 * @param mixed $userInfo
-	 * @return \OCP\IUser
-	 * @throws LoginException
-	 */
-	private function lookupUser($userInfo) {
-		$openIdConfig = $this->client->getOpenIdConfig();
-		$searchByEmail = true;
-		if (isset($openIdConfig['mode']) && $openIdConfig['mode'] === 'userid') {
-			$searchByEmail = false;
-		}
-		$attribute = 'email';
-		if (isset($openIdConfig['search-attribute'])) {
-			$attribute = $openIdConfig['search-attribute'];
-		}
-
-		if ($searchByEmail) {
-			$user = $this->userManager->getByEmail($userInfo->$attribute);
-			if (!$user) {
-				throw new LoginException("User with {$userInfo->$attribute} is not known.");
-			}
-			if (\count($user) !== 1) {
-				throw new LoginException("{$userInfo->$attribute} is not unique.");
-			}
-			return $user[0];
-		}
-		$user = $this->userManager->get($userInfo->$attribute);
-		if (!$user) {
-			throw new LoginException("User {$userInfo->$attribute} is not known.");
-		}
-		return $user;
 	}
 }

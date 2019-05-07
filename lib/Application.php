@@ -24,7 +24,10 @@ namespace OCA\OpenIdConnect;
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Jumbojett\OpenIDConnectClientException;
+use OCA\OpenIdConnect\Sabre\OpenIdSabreAuthPlugin;
 use OCP\AppFramework\App;
+use OCP\SabrePluginEvent;
+use Sabre\DAV\Auth\Plugin;
 
 class Application extends App {
 	public function __construct(array $urlParams = []) {
@@ -32,6 +35,7 @@ class Application extends App {
 	}
 
 	/**
+	 * @throws OpenIDConnectClientException
 	 * @throws \OC\HintException
 	 */
 	public function boot() {
@@ -63,6 +67,22 @@ class Application extends App {
 				}
 			}
 		}
+		// Add event listener
+		$dispatcher = $server->getEventDispatcher();
+		$dispatcher->addListener('OCA\DAV\Connector\Sabre::authInit', function ($event) use ($server) {
+			if ($event instanceof SabrePluginEvent) {
+				$authPlugin = $event->getServer()->getPlugin('auth');
+				if ($authPlugin instanceof Plugin) {
+					$authPlugin->addBackend(
+						new OpenIdSabreAuthPlugin($server->getSession(),
+							$server->getUserSession(),
+							$server->getRequest(),
+							$server->query(OpenIdConnectAuthModule::class),
+							'principals/')
+					);
+				}
+			}
+		});
 
 		$this->verifySession();
 	}
