@@ -110,6 +110,7 @@ class LoginFlowController extends Controller {
 		}
 		$openid->authenticate();
 		$this->logger->debug('Access token: ' . $openid->getAccessToken());
+		$this->logger->debug('Refresh token: ' . $openid->getRefreshToken());
 		$userInfo = $openid->requestUserInfo();
 		$this->logger->debug('User info: ' . \json_encode($userInfo));
 		if (!$userInfo) {
@@ -118,9 +119,12 @@ class LoginFlowController extends Controller {
 		$user = $this->lookupUser($userInfo);
 
 		// trigger login process
-		if ($this->userSession->loginUser($user, '')) {
+
+		if ($this->userSession->createSessionToken($this->request, $user->getUID(), $user->getUID()) &&
+			$this->userSession->loginUser($user, null)) {
 			$this->session->set('oca.openid-connect.access-token', $openid->getAccessToken());
 			$this->session->set('oca.openid-connect.refresh-token', $openid->getRefreshToken());
+
 			/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
 			if (isset($openid->getIdTokenPayload()->sid)) {
 				/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
@@ -129,6 +133,8 @@ class LoginFlowController extends Controller {
 				\OC::$server->getMemCacheFactory()
 					->create('oca.openid-connect.sessions')
 					->set($sid, true);
+			} else {
+				\OC::$server->getLogger()->debug('Id token holds no sid: ' . \json_encode($openid->getIdTokenPayload()));
 			}
 			return new RedirectResponse($this->getDefaultUrl());
 		}
@@ -145,13 +151,23 @@ class LoginFlowController extends Controller {
 	 * @return Response
 	 */
 	public function logout($iss = null, $sid = null) {
-		if ($iss === null || $sid === null) {
-			$this->logger->warning("OpenID::logout: missing parameters: iss={$iss} and sid={$sid}", ['app' => 'OpenId']);
-			return new Response();
-		}
+		// fail fast if not configured
 		$openIdConfig = $this->client->getOpenIdConfig();
 		if ($openIdConfig === null) {
 			$this->logger->warning('OpenID::logout: OpenID is not properly configured', ['app' => 'OpenId']);
+			return new Response();
+		}
+		// there is an active session -> logout
+		if ($this->userSession->isLoggedIn()) {
+			$this->logger->debug('OpenID::logout: There is an active session -> performing logout', ['app' => 'OpenId']);
+			// complete logout
+			$this->session->set('oca.openid-connect.within-logout', true);
+			$this->userSession->logout();
+		}
+		if ($iss === null || $sid === null) {
+			if (!$this->userSession->isLoggedIn()) {
+				$this->logger->warning("OpenID::logout: missing parameters: iss={$iss} and sid={$sid} and no active session", ['app' => 'OpenId']);
+			}
 			return new Response();
 		}
 		if (isset($openIdConfig['provider-url'])) {
