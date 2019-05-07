@@ -1,30 +1,27 @@
 <?php
 /**
+ * ownCloud
+ *
  * @author Thomas Müller <thomas.mueller@tmit.eu>
+ * @copyright (C) 2019 ownCloud GmbH
+ * @license ownCloud Commercial License
  *
- * @copyright Copyright (c) 2019, ownCloud GmbH
- * @license AGPL-3.0
+ * This code is covered by the ownCloud Commercial License.
  *
- * This code is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * You should have received a copy of the ownCloud Commercial License
+ * along with this program. If not, see
+ * <https://owncloud.com/licenses/owncloud-commercial/>.
  *
  */
-
 namespace OCA\OpenIdConnect;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Jumbojett\OpenIDConnectClientException;
+use OCA\OpenIdConnect\Sabre\OpenIdSabreAuthPlugin;
 use OCP\AppFramework\App;
+use OCP\SabrePluginEvent;
+use Sabre\DAV\Auth\Plugin;
 
 class Application extends App {
 	public function __construct(array $urlParams = []) {
@@ -32,6 +29,7 @@ class Application extends App {
 	}
 
 	/**
+	 * @throws OpenIDConnectClientException
 	 * @throws \OC\HintException
 	 */
 	public function boot() {
@@ -63,6 +61,22 @@ class Application extends App {
 				}
 			}
 		}
+		// Add event listener
+		$dispatcher = $server->getEventDispatcher();
+		$dispatcher->addListener('OCA\DAV\Connector\Sabre::authInit', function ($event) use ($server) {
+			if ($event instanceof SabrePluginEvent) {
+				$authPlugin = $event->getServer()->getPlugin('auth');
+				if ($authPlugin instanceof Plugin) {
+					$authPlugin->addBackend(
+						new OpenIdSabreAuthPlugin($server->getSession(),
+							$server->getUserSession(),
+							$server->getRequest(),
+							$server->query(OpenIdConnectAuthModule::class),
+							'principals/')
+					);
+				}
+			}
+		});
 
 		$this->verifySession();
 	}

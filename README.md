@@ -65,7 +65,7 @@ a redirect on the web server to point .well-known/openid-configuration to /index
 
 This is an .htaccess example
 ```
-  RewriteRule ^\.well-known/openid-configuration /index.php/apps/openidconnect/config [QSA,L]
+  RewriteRule ^\.well-known/openid-configuration /index.php/apps/openidconnect/config [R=301,L]
 ```
 
 Please note that service discovery is not mandatory at the moment since no client is supporting this yet.
