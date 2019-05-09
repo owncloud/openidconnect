@@ -3,4 +3,3 @@ parameters:
   ignoreErrors:
     - '#Access to an undefined property object::\$exp#'
     - '#Parameter \#2 \$redirect of method Jumbojett\\OpenIDConnectClient::signOut\(\) expects string, null given.#'
-    - '#Parameter \#2 \$password of method OC\\User\\Session::loginUser\(\) expects string, null given.#'

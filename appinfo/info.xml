@@ -19,4 +19,7 @@
     <types>
         <authentication/>
     </types>
+    <auth-modules>
+        <module>OCA\OpenIdConnect\OpenIdConnectAuthModule</module>
+    </auth-modules>
 </info>

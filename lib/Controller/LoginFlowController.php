@@ -1,30 +1,25 @@
 <?php
 /**
+ * ownCloud
+ *
  * @author Thomas Müller <thomas.mueller@tmit.eu>
+ * @copyright (C) 2019 ownCloud GmbH
+ * @license ownCloud Commercial License
  *
- * @copyright Copyright (c) 2019, ownCloud GmbH
- * @license AGPL-3.0
+ * This code is covered by the ownCloud Commercial License.
  *
- * This code is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * You should have received a copy of the ownCloud Commercial License
+ * along with this program. If not, see
+ * <https://owncloud.com/licenses/owncloud-commercial/>.
  *
  */
-
 namespace OCA\OpenIdConnect\Controller;
 
 use OC\HintException;
 use OC\User\LoginException;
 use OC\User\Session;
 use OCA\OpenIdConnect\Client;
+use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\RedirectResponse;
@@ -32,7 +27,6 @@ use OCP\AppFramework\Http\Response;
 use OCP\ILogger;
 use OCP\IRequest;
 use OCP\ISession;
-use OCP\IUserManager;
 use OCP\IUserSession;
 use OCP\Util;
 
@@ -43,9 +37,9 @@ class LoginFlowController extends Controller {
 	 */
 	private $session;
 	/**
-	 * @var IUserManager
+	 * @var UserLookupService
 	 */
-	private $userManager;
+	private $userLookup;
 	/**
 	 * @var Session
 	 */
@@ -61,7 +55,7 @@ class LoginFlowController extends Controller {
 
 	public function __construct(string $appName,
 								IRequest $request,
-								IUserManager $userManager,
+								UserLookupService $userLookup,
 								IUserSession $userSession,
 								ISession $session,
 								ILogger $logger,
@@ -73,7 +67,7 @@ class LoginFlowController extends Controller {
 		}
 
 		$this->session = $session;
-		$this->userManager = $userManager;
+		$this->userLookup = $userLookup;
 		$this->userSession = $userSession;
 		$this->client = $client;
 		$this->logger = $logger;
@@ -83,7 +77,7 @@ class LoginFlowController extends Controller {
 	 * @NoCSRFRequired
 	 * @NoAdminRequired
 	 * @PublicPage
-	 * @UseSession
+	 * @CORS
 	 */
 	public function config() {
 		$openid = $this->getOpenIdConnectClient();
@@ -116,7 +110,7 @@ class LoginFlowController extends Controller {
 		if (!$userInfo) {
 			throw new LoginException('No user information available.');
 		}
-		$user = $this->lookupUser($userInfo);
+		$user = $this->userLookup->lookupUser($userInfo);
 
 		// trigger login process
 
@@ -206,38 +200,5 @@ class LoginFlowController extends Controller {
 			return null;
 		}
 		return $this->client;
-	}
-
-	/**
-	 * @param mixed $userInfo
-	 * @return \OCP\IUser
-	 * @throws LoginException
-	 */
-	private function lookupUser($userInfo) {
-		$openIdConfig = $this->client->getOpenIdConfig();
-		$searchByEmail = true;
-		if (isset($openIdConfig['mode']) && $openIdConfig['mode'] === 'userid') {
-			$searchByEmail = false;
-		}
-		$attribute = 'email';
-		if (isset($openIdConfig['search-attribute'])) {
-			$attribute = $openIdConfig['search-attribute'];
-		}
-
-		if ($searchByEmail) {
-			$user = $this->userManager->getByEmail($userInfo->$attribute);
-			if (!$user) {
-				throw new LoginException("User with {$userInfo->$attribute} is not known.");
-			}
-			if (\count($user) !== 1) {
-				throw new LoginException("{$userInfo->$attribute} is not unique.");
-			}
-			return $user[0];
-		}
-		$user = $this->userManager->get($userInfo->$attribute);
-		if (!$user) {
-			throw new LoginException("User {$userInfo->$attribute} is not known.");
-		}
-		return $user;
 	}
 }
