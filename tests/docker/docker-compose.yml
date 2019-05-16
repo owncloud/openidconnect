@@ -30,14 +30,15 @@ services:
       - OWNCLOUD_MYSQL_UTF8MB4=true
       - OWNCLOUD_REDIS_ENABLED=true
       - OWNCLOUD_REDIS_HOST=redis
+      - OWNCLOUD_LOG_LEVEL=0
     healthcheck:
       test: ["CMD", "/usr/bin/healthcheck"]
       interval: 30s
       timeout: 10s
       retries: 5
     volumes:
-      - ../../:/mnt/data/apps/openidconnect
-      - ./oidc.config.php:/mnt/data/config/oidc.config.php
+      - ../../:/mnt/data/apps/openidconnect:ro
+      - ./oidc.config.php:/mnt/data/config/oidc.config.php:ro
       - files:/mnt/data
 
   db:

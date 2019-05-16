@@ -86,8 +86,8 @@ module.exports.clients = [
     client_id: 'ownCloud',
     client_secret: 'ownCloud',
     grant_types: ['refresh_token', 'authorization_code'],
-    redirect_uris: ['http://localhost:8080/apps/openidconnect/redirect'],
-    frontchannel_logout_uri: 'http://localhost:8080/apps/openidconnect/logout'
+    redirect_uris: ['http://10.254.254.254:8080/apps/openidconnect/redirect'],
+    frontchannel_logout_uri: 'http://10.254.254.254:8080/apps/openidconnect/logout'
   }
 ];
 
