@@ -37,8 +37,8 @@ services:
       timeout: 10s
       retries: 5
     volumes:
-      - ../../:/mnt/data/apps/openidconnect:ro
-      - ./oidc.config.php:/mnt/data/config/oidc.config.php:ro
+      - ../../:/mnt/data/apps/openidconnect
+      - ./oidc.config.php:/mnt/data/config/oidc.config.php
       - files:/mnt/data
 
   db:
