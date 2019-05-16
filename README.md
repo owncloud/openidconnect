@@ -78,7 +78,7 @@ To set it up locally do the following:
 1. Clone panva/node-oidc-provider
 2. yarn install
 3. cd example
-4. Add client config into https://github.com/panva/node-oidc-provider/blob/d47ef0ee05cdf888325eef0902883a9e49899b21/example/support/configuration.js#L84
+4. Add client config into https://github.com/panva/node-oidc-provider/blob/master/example/support/configuration.js#L14
     ```
     module.exports.clients = [
       {
