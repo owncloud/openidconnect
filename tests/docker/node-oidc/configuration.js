@@ -18,6 +18,13 @@ module.exports = Object.assign({
       grant_types: ['refresh_token', 'authorization_code'],
       redirect_uris: ['http://10.254.254.254:8080/apps/openidconnect/redirect'],
       frontchannel_logout_uri: 'http://10.254.254.254:8080/apps/openidconnect/logout'
+    },
+    {
+      application_type: 'native',
+      client_id: 'mxd5OQDk6es5LzOzRvidJNfXLUZS2oN3oUFeXPP8LpPrhx3UroJFduGEYIBOxkY1',
+      client_secret: 'KFeFWWEZO9TkisIQzR3fo7hfiMXlOpaqP8CFuTbSHzV1TUuGECglPxpiVKJfOXIx',
+      grant_types: ['refresh_token', 'authorization_code'],
+      redirect_uris: ['oc.ios://ios.owncloud.com']
     }
   ],
   cookies: {
