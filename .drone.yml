@@ -278,16 +278,7 @@ steps:
   pull: always
   image: owncloudci/php:7.0
   commands:
-  - make test-php-unit-dbg
-
-- name: codecov-upload
-  pull: always
-  image: plugins/codecov:2
-  settings:
-    paths:
-    - tests/output/clover.xml
-    token:
-      from_secret: codecov_token
+  - make test-php-unit
 
 trigger:
   ref:
@@ -348,16 +339,7 @@ steps:
   pull: always
   image: owncloudci/php:7.0
   commands:
-  - make test-php-unit-dbg
-
-- name: codecov-upload
-  pull: always
-  image: plugins/codecov:2
-  settings:
-    paths:
-    - tests/output/clover.xml
-    token:
-      from_secret: codecov_token
+  - make test-php-unit
 
 services:
 - name: mariadb
@@ -428,16 +410,7 @@ steps:
   pull: always
   image: owncloudci/php:7.0
   commands:
-  - make test-php-unit-dbg
-
-- name: codecov-upload
-  pull: always
-  image: plugins/codecov:2
-  settings:
-    paths:
-    - tests/output/clover.xml
-    token:
-      from_secret: codecov_token
+  - make test-php-unit
 
 services:
 - name: mysql
@@ -508,16 +481,7 @@ steps:
   pull: always
   image: owncloudci/php:7.0
   commands:
-  - make test-php-unit-dbg
-
-- name: codecov-upload
-  pull: always
-  image: plugins/codecov:2
-  settings:
-    paths:
-    - tests/output/clover.xml
-    token:
-      from_secret: codecov_token
+  - make test-php-unit
 
 services:
 - name: mysql
@@ -588,16 +552,7 @@ steps:
   pull: always
   image: owncloudci/php:7.0
   commands:
-  - make test-php-unit-dbg
-
-- name: codecov-upload
-  pull: always
-  image: plugins/codecov:2
-  settings:
-    paths:
-    - tests/output/clover.xml
-    token:
-      from_secret: codecov_token
+  - make test-php-unit
 
 services:
 - name: postgres
@@ -667,16 +622,7 @@ steps:
   pull: always
   image: owncloudci/php:7.0
   commands:
-  - make test-php-unit-dbg
-
-- name: codecov-upload
-  pull: always
-  image: plugins/codecov:2
-  settings:
-    paths:
-    - tests/output/clover.xml
-    token:
-      from_secret: codecov_token
+  - make test-php-unit
 
 services:
 - name: oracle

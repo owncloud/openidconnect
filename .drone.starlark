@@ -23,7 +23,8 @@ config = {
 		'allDatabases' : {
 			'phpVersions': [
 				'7.0',
-			]
+			],
+			'coverage': False
 		},
 		'reducedDatabases' : {
 			'phpVersions': [
