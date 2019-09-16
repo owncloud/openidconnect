@@ -152,7 +152,7 @@ class Application extends App {
 			$introspectionClientSecret = isset($client->getOpenIdConfig()['token-introspection-endpoint-client-secret']) ? $client->getOpenIdConfig()['token-introspection-endpoint-client-secret'] : null;
 
 			$introData = $client->introspectToken($accessToken, '', $introspectionClientId, $introspectionClientSecret);
-			\OC::$server->getLogger()->debug('Introspection info: ' . \json_encode($introData));
+			\OC::$server->getLogger()->debug('Introspection info: ' . \json_encode($introData) . ' for access token:' . $accessToken);
 			if (\property_exists($introData, 'error')) {
 				\OC::$server->getLogger()->error('Token introspection failed: ' . \json_encode($introData));
 				$this->logout();
@@ -169,7 +169,7 @@ class Application extends App {
 		} else {
 			$client->verifyJWTsignature($accessToken);
 			$payload = $client->getAccessTokenPayload();
-			\OC::$server->getLogger()->debug('Access token payload: ' . \json_encode($payload));
+			\OC::$server->getLogger()->debug('Access token payload: ' . \json_encode($payload) . ' for access token:' . $accessToken);
 
 			$this->getCache()->set($accessToken, $payload->exp);
 			/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
@@ -211,8 +211,7 @@ class Application extends App {
 				$server->getSession()->set('oca.openid-connect.access-token', $client->getAccessToken());
 				$server->getSession()->set('oca.openid-connect.refresh-token', $client->getRefreshToken());
 			} else {
-				\OC::$server->getLogger()->debug('No refresh token available -> logout');
-				$this->logout();
+				\OC::$server->getLogger()->debug('No refresh token available -> nothing to do. We will be kicked out as soon as the access token expires.');
 			}
 		}
 	}

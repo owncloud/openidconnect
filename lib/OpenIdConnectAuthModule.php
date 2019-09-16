@@ -140,7 +140,11 @@ class OpenIdConnectAuthModule implements IAuthModule {
 			}
 			return $introData->exp;
 		}
-		$this->client->verifyJWTsignature($bearerToken);
+		if (!$this->client->verifyJWTsignature($bearerToken)) {
+			$this->logger->error('Token cannot be verified: ' . $bearerToken);
+			throw new OpenIDConnectClientException('Token cannot be verified.');
+		}
+		$this->client->setAccessToken($bearerToken);
 		$payload = $this->client->getAccessTokenPayload();
 		$this->logger->debug('Access token payload: ' . \json_encode($payload));
 		/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
