@@ -55,6 +55,8 @@ steps:
   pull: always
   image: owncloudci/php:7.2
   commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
   - cd /var/www/owncloud/server
   - php occ a:l
   - php occ a:e openidconnect
@@ -262,6 +264,8 @@ steps:
   pull: always
   image: owncloudci/php:7.0
   commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
   - cd /var/www/owncloud/server
   - php occ a:l
   - php occ a:e openidconnect
@@ -330,6 +334,8 @@ steps:
   pull: always
   image: owncloudci/php:7.0
   commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
   - cd /var/www/owncloud/server
   - php occ a:l
   - php occ a:e openidconnect
@@ -408,6 +414,8 @@ steps:
   pull: always
   image: owncloudci/php:7.0
   commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
   - cd /var/www/owncloud/server
   - php occ a:l
   - php occ a:e openidconnect
@@ -486,6 +494,8 @@ steps:
   pull: always
   image: owncloudci/php:7.0
   commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
   - cd /var/www/owncloud/server
   - php occ a:l
   - php occ a:e openidconnect
@@ -564,6 +574,8 @@ steps:
   pull: always
   image: owncloudci/php:7.0
   commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
   - cd /var/www/owncloud/server
   - php occ a:l
   - php occ a:e openidconnect
@@ -641,6 +653,8 @@ steps:
   pull: always
   image: owncloudci/php:7.0
   commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
   - cd /var/www/owncloud/server
   - php occ a:l
   - php occ a:e openidconnect
@@ -719,6 +733,8 @@ steps:
   pull: always
   image: owncloudci/php:7.1
   commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
   - cd /var/www/owncloud/server
   - php occ a:l
   - php occ a:e openidconnect
@@ -788,6 +804,8 @@ steps:
   pull: always
   image: owncloudci/php:7.1
   commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
   - cd /var/www/owncloud/server
   - php occ a:l
   - php occ a:e openidconnect
@@ -856,6 +874,8 @@ steps:
   pull: always
   image: owncloudci/php:7.2
   commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
   - cd /var/www/owncloud/server
   - php occ a:l
   - php occ a:e openidconnect
@@ -925,6 +945,8 @@ steps:
   pull: always
   image: owncloudci/php:7.2
   commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
   - cd /var/www/owncloud/server
   - php occ a:l
   - php occ a:e openidconnect
@@ -993,6 +1015,8 @@ steps:
   pull: always
   image: owncloudci/php:7.3
   commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
   - cd /var/www/owncloud/server
   - php occ a:l
   - php occ a:e openidconnect
@@ -1062,6 +1086,8 @@ steps:
   pull: always
   image: owncloudci/php:7.3
   commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
   - cd /var/www/owncloud/server
   - php occ a:l
   - php occ a:e openidconnect
