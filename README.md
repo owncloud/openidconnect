@@ -78,7 +78,7 @@ To set it up locally do the following:
 1. Clone panva/node-oidc-provider
 2. yarn install
 3. cd example
-4. Add client config into https://github.com/panva/node-oidc-provider/blob/d47ef0ee05cdf888325eef0902883a9e49899b21/example/support/configuration.js#L84
+4. Add client config into https://github.com/panva/node-oidc-provider/blob/master/example/support/configuration.js#L14
     ```
     module.exports.clients = [
       {
@@ -109,4 +109,13 @@ To set it up locally do the following:
     ```
 8. Clients can now use http://localhost:3000/.well-known/openid-configuration to obtain all information which is necessary
 to initiate the OpenId Connect flow. Use the granted access token in any request to ownCloud within a bearer authentication header.
-9. You can login with any credentials but you need to make sure that the user with the given user id exists. In a real world deployment the users will come from LDAP.
+9. You can login with any credentials but you need to make sure that the user with the given user id exists. In a real world deployment the users will come from LDAP.  
+Keep in mind that by default, oidc app will search for the `email` attribute - which is hardcoded to `johndoe@example.com` [ref](https://github.com/panva/node-oidc-provider/blob/master/example/support/account.js#L32)
+If you wish to map the login name on the oidc-provider with owncloud user ids, you can configure it as following:
+```
+    $CONFIG = [
+      'openid-connect' => [
+        'search-attribute' => 'sub',
+        'mode' => 'userid',
+      ]
+```
