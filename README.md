@@ -2,6 +2,8 @@
 
 ## Configuration
 
+Trigger CI
+
 ### General
 A distributed memcache setup is required to properly operate this app - like Redis or memcached.
 For development purpose APCu is reasonable as well.
