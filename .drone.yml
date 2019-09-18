@@ -1,239 +1,1151 @@
+---
+kind: pipeline
+type: docker
+name: coding-standard-php7.0
+
+platform:
+  os: linux
+  arch: amd64
+
 workspace:
   base: /var/www/owncloud
-  path: apps/openidconnect
+  path: server/apps/openidconnect
 
-branches: [ master, release* ]
+steps:
+- name: coding-standard
+  pull: always
+  image: owncloudci/php:7.0
+  commands:
+  - make test-php-style
 
-pipeline:
-  install-server:
-    image: owncloudci/core
-    pull: true
-    git_reference: stable10
-    db_type: ${DB_TYPE}
-    db_name: ${DB_NAME=owncloud}
-    db_host: ${DB_TYPE}
-    db_username: autotest
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
+
+---
+kind: pipeline
+type: docker
+name: phpstan-php7.2
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
+
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: sqlite
+    db_name: owncloud
     db_password: owncloud
-    when:
-      matrix:
-        NEED_SERVER: true
+    db_type: sqlite
+    db_username: owncloud
+    exclude: apps/openidconnect
+    version: daily-master-qa
 
-  install-app:
-    image: owncloudci/php
-    pull: true
-    environment:
-      - COMPOSER_HOME=/var/www/owncloud/apps/openidconnect/.cache/composer
-    commands:
-      - make vendor
-      - cp tests/drone/oidc.config.php /var/www/owncloud/config/
-      - cd /var/www/owncloud/
-      - php occ a:l
-      - php occ a:e openidconnect
-      - php occ a:e testing
-      - php occ a:l
-    when:
-      matrix:
-        NEED_INSTALL_APP: true
+- name: setup-server-openidconnect
+  pull: always
+  image: owncloudci/php:7.2
+  commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
+  - cd /var/www/owncloud/server
+  - php occ a:l
+  - php occ a:e openidconnect
+  - php occ a:e testing
+  - php occ a:l
+  - php occ config:system:set trusted_domains 1 --value=server
+  - php occ log:manage --level 2
 
-  owncloud-coding-standard:
-    image: owncloudci/php
-    pull: true
-    environment:
-      - COMPOSER_HOME=/var/www/owncloud/apps/openidconnect/.cache/composer
-    commands:
-      - make test-php-style
-    when:
-      matrix:
-        TEST_SUITE: owncloud-coding-standard
+- name: phpstan
+  pull: always
+  image: owncloudci/php:7.2
+  commands:
+  - make test-php-phpstan
 
-  phpstan:
-    # phpstan requires php7.1
-    image: owncloudci/php:7.1
-    pull: true
-    environment:
-      - COMPOSER_HOME=/var/www/owncloud/apps/openidconnect/.cache/composer
-    commands:
-      - make test-php-phpstan
-    when:
-      matrix:
-        TEST_SUITE: php-stan
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
 
-  phan-70:
-    # phan requires a recent php-ast extension
-    image: owncloudci/php:7.0
-    pull: true
-    environment:
-      - COMPOSER_HOME=/var/www/owncloud/apps/openidconnect/.cache/composer
-    commands:
-      - make test-php-phan
-    when:
-      matrix:
-        TEST_SUITE: phan
+---
+kind: pipeline
+type: docker
+name: phan-php7.0
 
-  phan-71:
-    # phan requires a recent php-ast extension
-    image: owncloudci/php:7.1
-    pull: true
-    environment:
-      - COMPOSER_HOME=/var/www/owncloud/apps/openidconnect/.cache/composer
-    commands:
-      - make test-php-phan
-    when:
-      matrix:
-        TEST_SUITE: phan
+platform:
+  os: linux
+  arch: amd64
 
-  phan-72:
-    # phan requires a recent php-ast extension
-    image: owncloudci/php:7.2
-    pull: true
-    environment:
-      - COMPOSER_HOME=/var/www/owncloud/apps/openidconnect/.cache/composer
-    commands:
-      - make test-php-phan
-    when:
-      matrix:
-        TEST_SUITE: phan
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
 
-  php-unit:
-    image: owncloudci/php
-    pull: true
-    commands:
-      - make test-php-unit-dbg
-    when:
-      matrix:
-        TEST_SUITE: php-unit
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: sqlite
+    db_name: owncloud
+    db_password: owncloud
+    db_type: sqlite
+    db_username: owncloud
+    exclude: apps/openidconnect
+    version: daily-master-qa
 
-  test-javascript:
-    image: owncloudci/php
-    pull: true
-    commands:
-      - make test-js
-    when:
-      matrix:
-        TEST_SUITE: javascript
+- name: phan
+  pull: always
+  image: owncloudci/php:7.0
+  commands:
+  - make test-php-phan
 
-  codecov:
-    image: plugins/codecov:2
-    secrets: [codecov_token]
-    pull: true
-    files:
-      - tests/output/clover-unit.xml
-    when:
-      matrix:
-        COVERAGE: true
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
 
-  build:
-    image: owncloudci/php
-    pull: true
-    commands:
-      - pwd
-      - ls -l
-      - make -f Makefile.release dist
-    when:
-     matrix:
-       TEST_SUITE: build
+---
+kind: pipeline
+type: docker
+name: phan-php7.1
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
+
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: sqlite
+    db_name: owncloud
+    db_password: owncloud
+    db_type: sqlite
+    db_username: owncloud
+    exclude: apps/openidconnect
+    version: daily-master-qa
+
+- name: phan
+  pull: always
+  image: owncloudci/php:7.1
+  commands:
+  - make test-php-phan
+
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
+
+---
+kind: pipeline
+type: docker
+name: phan-php7.2
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
+
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: sqlite
+    db_name: owncloud
+    db_password: owncloud
+    db_type: sqlite
+    db_username: owncloud
+    exclude: apps/openidconnect
+    version: daily-master-qa
+
+- name: phan
+  pull: always
+  image: owncloudci/php:7.2
+  commands:
+  - make test-php-phan
+
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
+
+---
+kind: pipeline
+type: docker
+name: phan-php7.3
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
+
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: sqlite
+    db_name: owncloud
+    db_password: owncloud
+    db_type: sqlite
+    db_username: owncloud
+    exclude: apps/openidconnect
+    version: daily-master-qa
+
+- name: phan
+  pull: always
+  image: owncloudci/php:7.3
+  commands:
+  - make test-php-phan
+
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
+
+---
+kind: pipeline
+type: docker
+name: build
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
+
+steps:
+- name: build
+  pull: always
+  image: owncloudci/php
+  commands:
+  - pwd
+  - ls -l
+  - make -f Makefile.release dist
+
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
+
+depends_on:
+- coding-standard-php7.0
+- phpstan-php7.2
+- phan-php7.0
+- phan-php7.1
+- phan-php7.2
+- phan-php7.3
+
+---
+kind: pipeline
+type: docker
+name: phpunit-php7.0-sqlite
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
+
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: sqlite
+    db_name: owncloud
+    db_password: owncloud
+    db_type: sqlite
+    db_username: owncloud
+    exclude: apps/openidconnect
+    version: daily-master-qa
+
+- name: setup-server-openidconnect
+  pull: always
+  image: owncloudci/php:7.0
+  commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
+  - cd /var/www/owncloud/server
+  - php occ a:l
+  - php occ a:e openidconnect
+  - php occ a:e testing
+  - php occ a:l
+  - php occ config:system:set trusted_domains 1 --value=server
+  - php occ log:manage --level 2
+
+- name: phpunit-tests
+  pull: always
+  image: owncloudci/php:7.0
+  commands:
+  - make test-php-unit
+
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
+
+depends_on:
+- coding-standard-php7.0
+- phpstan-php7.2
+- phan-php7.0
+- phan-php7.1
+- phan-php7.2
+- phan-php7.3
+
+---
+kind: pipeline
+type: docker
+name: phpunit-php7.0-mariadb10.2
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
+
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: mariadb
+    db_name: owncloud
+    db_password: owncloud
+    db_type: mysql
+    db_username: owncloud
+    exclude: apps/openidconnect
+    version: daily-master-qa
+
+- name: setup-server-openidconnect
+  pull: always
+  image: owncloudci/php:7.0
+  commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
+  - cd /var/www/owncloud/server
+  - php occ a:l
+  - php occ a:e openidconnect
+  - php occ a:e testing
+  - php occ a:l
+  - php occ config:system:set trusted_domains 1 --value=server
+  - php occ log:manage --level 2
+
+- name: phpunit-tests
+  pull: always
+  image: owncloudci/php:7.0
+  commands:
+  - make test-php-unit
 
 services:
-  mysql:
-    image: mysql:5.5
-    environment:
-    - MYSQL_USER=autotest
-    - MYSQL_PASSWORD=owncloud
-    - MYSQL_DATABASE=${DB_NAME=owncloud}
-    - MYSQL_ROOT_PASSWORD=owncloud
-    when:
-      matrix:
-        DB_TYPE: mysql
+- name: mariadb
+  pull: always
+  image: mariadb:10.2
+  environment:
+    MYSQL_DATABASE: owncloud
+    MYSQL_PASSWORD: owncloud
+    MYSQL_ROOT_PASSWORD: owncloud
+    MYSQL_USER: owncloud
 
-  pgsql:
-    image: postgres:9.4
-    environment:
-    - POSTGRES_USER=autotest
-    - POSTGRES_PASSWORD=owncloud
-    - POSTGRES_DB=${DB_NAME=owncloud}
-    when:
-      matrix:
-        DB_TYPE: pgsql
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
 
-  oci:
-    image: deepdiver/docker-oracle-xe-11g
-    environment:
-    - ORACLE_USER=system
-    - ORACLE_PASSWORD=oracle
-    - ORACLE_DB=${DB_NAME=owncloud}
-    when:
-      matrix:
-        DB_TYPE: oci
+depends_on:
+- coding-standard-php7.0
+- phpstan-php7.2
+- phan-php7.0
+- phan-php7.1
+- phan-php7.2
+- phan-php7.3
 
-matrix:
-  include:
-  # owncloud-coding-standard
-  - PHP_VERSION: 7.2
-    TEST_SUITE: owncloud-coding-standard
+---
+kind: pipeline
+type: docker
+name: phpunit-php7.0-mysql5.5
 
-  # php-stan
-  - PHP_VERSION: 7.2
-    TEST_SUITE: php-stan
-    NEED_SERVER: true
-    NEED_INSTALL_APP: true
+platform:
+  os: linux
+  arch: amd64
 
-  # phan
-  - PHP_VERSION: 7.2
-    TEST_SUITE: phan
-    NEED_SERVER: true
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
 
-  # build
-  - PHP_VERSION: 7.2
-    TEST_SUITE: build
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: mysql
+    db_name: owncloud
+    db_password: owncloud
+    db_type: mysql
+    db_username: owncloud
+    exclude: apps/openidconnect
+    version: daily-master-qa
 
-  # Test suites
-  # php70
-  - PHP_VERSION: 7.0
-    OC_VERSION: daily-stable10-qa
-    TEST_SUITE: php-unit
-    DB_TYPE: mysql
-    NEED_SERVER: true
-    NEED_INSTALL_APP: true
-    COVERAGE: true
+- name: setup-server-openidconnect
+  pull: always
+  image: owncloudci/php:7.0
+  commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
+  - cd /var/www/owncloud/server
+  - php occ a:l
+  - php occ a:e openidconnect
+  - php occ a:e testing
+  - php occ a:l
+  - php occ config:system:set trusted_domains 1 --value=server
+  - php occ log:manage --level 2
 
-  - PHP_VERSION: 7.0
-    OC_VERSION: daily-stable10-qa
-    TEST_SUITE: php-unit
-    DB_TYPE: pgsql
-    NEED_SERVER: true
-    NEED_INSTALL_APP: true
-    COVERAGE: true
+- name: phpunit-tests
+  pull: always
+  image: owncloudci/php:7.0
+  commands:
+  - make test-php-unit
 
-  # php71
-  - PHP_VERSION: 7.1
-    OC_VERSION: daily-stable10-qa
-    TEST_SUITE: php-unit
-    DB_TYPE: mysql
-    NEED_SERVER: true
-    NEED_INSTALL_APP: true
-    COVERAGE: true
+services:
+- name: mysql
+  pull: always
+  image: mysql:5.5
+  environment:
+    MYSQL_DATABASE: owncloud
+    MYSQL_PASSWORD: owncloud
+    MYSQL_ROOT_PASSWORD: owncloud
+    MYSQL_USER: owncloud
 
-  - PHP_VERSION: 7.1
-    OC_VERSION: daily-stable10-qa
-    TEST_SUITE: php-unit
-    DB_TYPE: pgsql
-    NEED_SERVER: true
-    NEED_INSTALL_APP: true
-    COVERAGE: true
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
 
-  # php72
-  - PHP_VERSION: 7.2
-    OC_VERSION: daily-stable10-qa
-    TEST_SUITE: php-unit
-    DB_TYPE: mysql
-    NEED_SERVER: true
-    NEED_INSTALL_APP: true
-    COVERAGE: true
+depends_on:
+- coding-standard-php7.0
+- phpstan-php7.2
+- phan-php7.0
+- phan-php7.1
+- phan-php7.2
+- phan-php7.3
 
-  - PHP_VERSION: 7.2
-    OC_VERSION: daily-stable10-qa
-    TEST_SUITE: php-unit
-    DB_TYPE: pgsql
-    NEED_SERVER: true
-    NEED_INSTALL_APP: true
-    COVERAGE: true
+---
+kind: pipeline
+type: docker
+name: phpunit-php7.0-mysql5.7
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
+
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: mysql
+    db_name: owncloud
+    db_password: owncloud
+    db_type: mysql
+    db_username: owncloud
+    exclude: apps/openidconnect
+    version: daily-master-qa
+
+- name: setup-server-openidconnect
+  pull: always
+  image: owncloudci/php:7.0
+  commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
+  - cd /var/www/owncloud/server
+  - php occ a:l
+  - php occ a:e openidconnect
+  - php occ a:e testing
+  - php occ a:l
+  - php occ config:system:set trusted_domains 1 --value=server
+  - php occ log:manage --level 2
+
+- name: phpunit-tests
+  pull: always
+  image: owncloudci/php:7.0
+  commands:
+  - make test-php-unit
+
+services:
+- name: mysql
+  pull: always
+  image: mysql:5.7
+  environment:
+    MYSQL_DATABASE: owncloud
+    MYSQL_PASSWORD: owncloud
+    MYSQL_ROOT_PASSWORD: owncloud
+    MYSQL_USER: owncloud
+
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
+
+depends_on:
+- coding-standard-php7.0
+- phpstan-php7.2
+- phan-php7.0
+- phan-php7.1
+- phan-php7.2
+- phan-php7.3
+
+---
+kind: pipeline
+type: docker
+name: phpunit-php7.0-postgres9.4
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
+
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: postgres
+    db_name: owncloud
+    db_password: owncloud
+    db_type: pgsql
+    db_username: owncloud
+    exclude: apps/openidconnect
+    version: daily-master-qa
+
+- name: setup-server-openidconnect
+  pull: always
+  image: owncloudci/php:7.0
+  commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
+  - cd /var/www/owncloud/server
+  - php occ a:l
+  - php occ a:e openidconnect
+  - php occ a:e testing
+  - php occ a:l
+  - php occ config:system:set trusted_domains 1 --value=server
+  - php occ log:manage --level 2
+
+- name: phpunit-tests
+  pull: always
+  image: owncloudci/php:7.0
+  commands:
+  - make test-php-unit
+
+services:
+- name: postgres
+  pull: always
+  image: postgres:9.4
+  environment:
+    POSTGRES_DB: owncloud
+    POSTGRES_PASSWORD: owncloud
+    POSTGRES_USER: owncloud
+
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
+
+depends_on:
+- coding-standard-php7.0
+- phpstan-php7.2
+- phan-php7.0
+- phan-php7.1
+- phan-php7.2
+- phan-php7.3
+
+---
+kind: pipeline
+type: docker
+name: phpunit-php7.0-oracle
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
+
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: oracle
+    db_name: XE
+    db_password: oracle
+    db_type: oci
+    db_username: system
+    exclude: apps/openidconnect
+    version: daily-master-qa
+
+- name: setup-server-openidconnect
+  pull: always
+  image: owncloudci/php:7.0
+  commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
+  - cd /var/www/owncloud/server
+  - php occ a:l
+  - php occ a:e openidconnect
+  - php occ a:e testing
+  - php occ a:l
+  - php occ config:system:set trusted_domains 1 --value=server
+  - php occ log:manage --level 2
+
+- name: phpunit-tests
+  pull: always
+  image: owncloudci/php:7.0
+  commands:
+  - make test-php-unit
+
+services:
+- name: oracle
+  pull: always
+  image: deepdiver/docker-oracle-xe-11g:latest
+  environment:
+    ORACLE_DB: XE
+    ORACLE_DISABLE_ASYNCH_IO: true
+    ORACLE_PASSWORD: oracle
+    ORACLE_USER: system
+
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
+
+depends_on:
+- coding-standard-php7.0
+- phpstan-php7.2
+- phan-php7.0
+- phan-php7.1
+- phan-php7.2
+- phan-php7.3
+
+---
+kind: pipeline
+type: docker
+name: phpunit-php7.1-mysql5.5
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
+
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: mysql
+    db_name: owncloud
+    db_password: owncloud
+    db_type: mysql
+    db_username: owncloud
+    exclude: apps/openidconnect
+    version: daily-master-qa
+
+- name: setup-server-openidconnect
+  pull: always
+  image: owncloudci/php:7.1
+  commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
+  - cd /var/www/owncloud/server
+  - php occ a:l
+  - php occ a:e openidconnect
+  - php occ a:e testing
+  - php occ a:l
+  - php occ config:system:set trusted_domains 1 --value=server
+  - php occ log:manage --level 2
+
+- name: phpunit-tests
+  pull: always
+  image: owncloudci/php:7.1
+  commands:
+  - make test-php-unit
+
+services:
+- name: mysql
+  pull: always
+  image: mysql:5.5
+  environment:
+    MYSQL_DATABASE: owncloud
+    MYSQL_PASSWORD: owncloud
+    MYSQL_ROOT_PASSWORD: owncloud
+    MYSQL_USER: owncloud
+
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
+
+depends_on:
+- coding-standard-php7.0
+- phpstan-php7.2
+- phan-php7.0
+- phan-php7.1
+- phan-php7.2
+- phan-php7.3
+
+---
+kind: pipeline
+type: docker
+name: phpunit-php7.1-postgres9.4
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
+
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: postgres
+    db_name: owncloud
+    db_password: owncloud
+    db_type: pgsql
+    db_username: owncloud
+    exclude: apps/openidconnect
+    version: daily-master-qa
+
+- name: setup-server-openidconnect
+  pull: always
+  image: owncloudci/php:7.1
+  commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
+  - cd /var/www/owncloud/server
+  - php occ a:l
+  - php occ a:e openidconnect
+  - php occ a:e testing
+  - php occ a:l
+  - php occ config:system:set trusted_domains 1 --value=server
+  - php occ log:manage --level 2
+
+- name: phpunit-tests
+  pull: always
+  image: owncloudci/php:7.1
+  commands:
+  - make test-php-unit
+
+services:
+- name: postgres
+  pull: always
+  image: postgres:9.4
+  environment:
+    POSTGRES_DB: owncloud
+    POSTGRES_PASSWORD: owncloud
+    POSTGRES_USER: owncloud
+
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
+
+depends_on:
+- coding-standard-php7.0
+- phpstan-php7.2
+- phan-php7.0
+- phan-php7.1
+- phan-php7.2
+- phan-php7.3
+
+---
+kind: pipeline
+type: docker
+name: phpunit-php7.2-mysql5.5
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
+
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: mysql
+    db_name: owncloud
+    db_password: owncloud
+    db_type: mysql
+    db_username: owncloud
+    exclude: apps/openidconnect
+    version: daily-master-qa
+
+- name: setup-server-openidconnect
+  pull: always
+  image: owncloudci/php:7.2
+  commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
+  - cd /var/www/owncloud/server
+  - php occ a:l
+  - php occ a:e openidconnect
+  - php occ a:e testing
+  - php occ a:l
+  - php occ config:system:set trusted_domains 1 --value=server
+  - php occ log:manage --level 2
+
+- name: phpunit-tests
+  pull: always
+  image: owncloudci/php:7.2
+  commands:
+  - make test-php-unit
+
+services:
+- name: mysql
+  pull: always
+  image: mysql:5.5
+  environment:
+    MYSQL_DATABASE: owncloud
+    MYSQL_PASSWORD: owncloud
+    MYSQL_ROOT_PASSWORD: owncloud
+    MYSQL_USER: owncloud
+
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
+
+depends_on:
+- coding-standard-php7.0
+- phpstan-php7.2
+- phan-php7.0
+- phan-php7.1
+- phan-php7.2
+- phan-php7.3
+
+---
+kind: pipeline
+type: docker
+name: phpunit-php7.2-postgres9.4
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
+
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: postgres
+    db_name: owncloud
+    db_password: owncloud
+    db_type: pgsql
+    db_username: owncloud
+    exclude: apps/openidconnect
+    version: daily-master-qa
+
+- name: setup-server-openidconnect
+  pull: always
+  image: owncloudci/php:7.2
+  commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
+  - cd /var/www/owncloud/server
+  - php occ a:l
+  - php occ a:e openidconnect
+  - php occ a:e testing
+  - php occ a:l
+  - php occ config:system:set trusted_domains 1 --value=server
+  - php occ log:manage --level 2
+
+- name: phpunit-tests
+  pull: always
+  image: owncloudci/php:7.2
+  commands:
+  - make test-php-unit
+
+services:
+- name: postgres
+  pull: always
+  image: postgres:9.4
+  environment:
+    POSTGRES_DB: owncloud
+    POSTGRES_PASSWORD: owncloud
+    POSTGRES_USER: owncloud
+
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
+
+depends_on:
+- coding-standard-php7.0
+- phpstan-php7.2
+- phan-php7.0
+- phan-php7.1
+- phan-php7.2
+- phan-php7.3
+
+---
+kind: pipeline
+type: docker
+name: phpunit-php7.3-mysql5.5
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
+
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: mysql
+    db_name: owncloud
+    db_password: owncloud
+    db_type: mysql
+    db_username: owncloud
+    exclude: apps/openidconnect
+    version: daily-master-qa
+
+- name: setup-server-openidconnect
+  pull: always
+  image: owncloudci/php:7.3
+  commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
+  - cd /var/www/owncloud/server
+  - php occ a:l
+  - php occ a:e openidconnect
+  - php occ a:e testing
+  - php occ a:l
+  - php occ config:system:set trusted_domains 1 --value=server
+  - php occ log:manage --level 2
+
+- name: phpunit-tests
+  pull: always
+  image: owncloudci/php:7.3
+  commands:
+  - make test-php-unit
+
+services:
+- name: mysql
+  pull: always
+  image: mysql:5.5
+  environment:
+    MYSQL_DATABASE: owncloud
+    MYSQL_PASSWORD: owncloud
+    MYSQL_ROOT_PASSWORD: owncloud
+    MYSQL_USER: owncloud
+
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
+
+depends_on:
+- coding-standard-php7.0
+- phpstan-php7.2
+- phan-php7.0
+- phan-php7.1
+- phan-php7.2
+- phan-php7.3
+
+---
+kind: pipeline
+type: docker
+name: phpunit-php7.3-postgres9.4
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /var/www/owncloud
+  path: server/apps/openidconnect
+
+steps:
+- name: install-core
+  pull: always
+  image: owncloudci/core
+  settings:
+    core_path: /var/www/owncloud/server
+    db_host: postgres
+    db_name: owncloud
+    db_password: owncloud
+    db_type: pgsql
+    db_username: owncloud
+    exclude: apps/openidconnect
+    version: daily-master-qa
+
+- name: setup-server-openidconnect
+  pull: always
+  image: owncloudci/php:7.3
+  commands:
+  - cd /var/www/owncloud/server/apps/openidconnect
+  - make vendor
+  - cd /var/www/owncloud/server
+  - php occ a:l
+  - php occ a:e openidconnect
+  - php occ a:e testing
+  - php occ a:l
+  - php occ config:system:set trusted_domains 1 --value=server
+  - php occ log:manage --level 2
+
+- name: phpunit-tests
+  pull: always
+  image: owncloudci/php:7.3
+  commands:
+  - make test-php-unit
+
+services:
+- name: postgres
+  pull: always
+  image: postgres:9.4
+  environment:
+    POSTGRES_DB: owncloud
+    POSTGRES_PASSWORD: owncloud
+    POSTGRES_USER: owncloud
+
+trigger:
+  ref:
+  - refs/pull/**
+  - refs/tags/**
+  - refs/heads/master
+
+depends_on:
+- coding-standard-php7.0
+- phpstan-php7.2
+- phan-php7.0
+- phan-php7.1
+- phan-php7.2
+- phan-php7.3
+
+---
+kind: pipeline
+type: docker
+name: chat-notifications
+
+platform:
+  os: linux
+  arch: amd64
+
+clone:
+  disable: true
+
+steps:
+- name: notify-rocketchat
+  pull: always
+  image: plugins/slack:1
+  settings:
+    channel: builds
+    webhook:
+      from_secret: private_rocketchat
+
+trigger:
+  ref:
+  - refs/tags/**
+  - refs/heads/master
+
+depends_on:
+- build
+- phpunit-php7.0-sqlite
+- phpunit-php7.0-mariadb10.2
+- phpunit-php7.0-mysql5.5
+- phpunit-php7.0-mysql5.7
+- phpunit-php7.0-postgres9.4
+- phpunit-php7.0-oracle
+- phpunit-php7.1-mysql5.5
+- phpunit-php7.1-postgres9.4
+- phpunit-php7.2-mysql5.5
+- phpunit-php7.2-postgres9.4
+- phpunit-php7.3-mysql5.5
+- phpunit-php7.3-postgres9.4
+
+...
