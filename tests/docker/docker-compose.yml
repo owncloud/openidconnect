@@ -40,6 +40,7 @@ services:
       - ../../:/mnt/data/apps/openidconnect
       - ./owncloud/openid-connect.sh:/etc/pre_server.d/openid-connect.sh
       - ./owncloud/oidc.config.php:/mnt/data/config/oidc.config.php
+      - ./owncloud/phoenix.config.php:/mnt/data/config/phoenix.config.php
       - files:/mnt/data
 
   db:

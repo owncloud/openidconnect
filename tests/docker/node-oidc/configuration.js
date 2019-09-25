@@ -25,8 +25,15 @@ module.exports = Object.assign({
       client_secret: 'KFeFWWEZO9TkisIQzR3fo7hfiMXlOpaqP8CFuTbSHzV1TUuGECglPxpiVKJfOXIx',
       grant_types: ['refresh_token', 'authorization_code'],
       redirect_uris: ['oc.ios://ios.owncloud.com']
-    }
-  ],
+    },
+    {
+	  client_id: 'phoenix',
+	  client_secret: 'phoenix-rocks!',
+  	  grant_types: ['refresh_token', 'authorization_code'],
+      redirect_uris: ['http://10.254.254.254:8300/oidc-callback.html'],
+	  token_endpoint_auth_method: 'none'
+  }
+],
   cookies: {
     long: { signed: true, maxAge: (1 * 24 * 60 * 60) * 1000 }, // 1 day in ms
     short: { signed: true },
