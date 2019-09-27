@@ -4,6 +4,7 @@
 - `10.254.254.254` as ip on a local (loopback) device  
 On MacOSx it is possible via `sudo ifconfig lo0 alias 10.254.254.254`  
 For Linux based system use `ip` (i.e. `ip addr add 10.254.254.254/32 dev lo`)
+For Windows (`netsh interface ip add address "Loopback" 10.254.254.254 255.255.255.255`)
 - php / composer installed in order to execute the `Makefile`
 
 ## Get started
