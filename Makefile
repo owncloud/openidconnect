@@ -21,8 +21,6 @@ PHPSTAN=php -d zend.enable_gc=0 vendor-bin/phpstan/vendor/bin/phpstan
 
 KARMA=$(NODE_PREFIX)/node_modules/.bin/karma
 
-nodejs_deps=node_modules
-
 .DEFAULT_GOAL := all
 
 help:
@@ -111,10 +109,6 @@ install-php-deps: vendor vendor-bin composer.json composer.lock
 .PHONY: install-js-deps
 install-js-deps: ## Install PHP dependencies
 install-js-deps: $(nodejs_deps)
-
-$(nodejs_deps): package.json yarn.lock
-	yarn install
-	touch $@
 
 vendor: composer.lock
 	$(COMPOSER_BIN) install --no-dev
