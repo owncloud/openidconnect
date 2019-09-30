@@ -254,10 +254,8 @@ workspace:
 steps:
 - name: build
   pull: always
-  image: owncloudci/php
+  image: owncloudci/php:7.0
   commands:
-  - pwd
-  - ls -l
   - make -f Makefile.release dist
 
 trigger:
