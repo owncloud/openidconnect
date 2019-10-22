@@ -15,6 +15,7 @@
  */
 namespace OCA\OpenIdConnect\Controller;
 
+use Jumbojett\OpenIDConnectClientException;
 use OC\HintException;
 use OC\User\LoginException;
 use OC\User\Session;
@@ -96,13 +97,18 @@ class LoginFlowController extends Controller {
 	 *
 	 * @throws HintException
 	 * @throws \Jumbojett\OpenIDConnectClientException
+	 * @throws LoginException
 	 */
 	public function login() {
 		$openid = $this->getOpenIdConnectClient();
 		if (!$openid) {
 			throw new HintException('Configuration issue in openidconnect app');
 		}
-		$openid->authenticate();
+		try {
+			$openid->authenticate();
+		} catch (OpenIDConnectClientException $ex) {
+			throw new HintException('Error in OpenIdConnect:' . $ex->getMessage());
+		}
 		$this->logger->debug('Access token: ' . $openid->getAccessToken());
 		$this->logger->debug('Refresh token: ' . $openid->getRefreshToken());
 		$userInfo = $openid->requestUserInfo();
