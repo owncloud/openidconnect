@@ -120,8 +120,10 @@ class Application extends App {
 		if ($accessToken === null) {
 			return;
 		}
+		$idToken = $server->getSession()->get('oca.openid-connect.id-token');
+
 		// register logout handler
-		$server->getEventDispatcher()->addListener('user.beforelogout', function () use ($client, $accessToken) {
+		$server->getEventDispatcher()->addListener('user.beforelogout', static function () use ($client, $accessToken, $idToken) {
 			// only call if access token is still valid
 			try {
 				if (\OC::$server->getSession()->get('oca.openid-connect.within-logout') === true) {
@@ -131,8 +133,8 @@ class Application extends App {
 					\OC::$server->getSession()->remove('oca.openid-connect.access-token');
 					\OC::$server->getSession()->remove('oca.openid-connect.refresh-token');
 				} else {
-					\OC::$server->getLogger()->debug('OIDC Logout: ending session ' . $accessToken);
-					$client->signOut($accessToken, null);
+					\OC::$server->getLogger()->debug('OIDC Logout: ending session ' . $accessToken . ' id: ' . $idToken);
+					$client->signOut($idToken, null);
 				}
 			} catch (OpenIDConnectClientException $ex) {
 				\OC::$server->getLogger()->logException($ex);
@@ -208,6 +210,7 @@ class Application extends App {
 					$this->logout();
 					throw new \OC\HintException($response->error_description);
 				}
+				$server->getSession()->set('oca.openid-connect.id-token', $client->getIdToken());
 				$server->getSession()->set('oca.openid-connect.access-token', $client->getAccessToken());
 				$server->getSession()->set('oca.openid-connect.refresh-token', $client->getRefreshToken());
 			} else {

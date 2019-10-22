@@ -122,6 +122,7 @@ class LoginFlowController extends Controller {
 
 		if ($this->userSession->createSessionToken($this->request, $user->getUID(), $user->getUID()) &&
 			$this->userSession->loginUser($user, null)) {
+			$this->session->set('oca.openid-connect.id-token', $openid->getIdToken());
 			$this->session->set('oca.openid-connect.access-token', $openid->getAccessToken());
 			$this->session->set('oca.openid-connect.refresh-token', $openid->getRefreshToken());
 
