@@ -20,6 +20,7 @@ use OC\HintException;
 use OC\User\LoginException;
 use OC\User\Session;
 use OCA\OpenIdConnect\Client;
+use OCA\OpenIdConnect\Logger;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
@@ -62,7 +63,6 @@ class LoginFlowController extends Controller {
 								ILogger $logger,
 								Client $client) {
 		parent::__construct($appName, $request);
-
 		if (!$userSession instanceof Session) {
 			throw new \Exception('We rely on internal implementation!');
 		}
@@ -71,7 +71,7 @@ class LoginFlowController extends Controller {
 		$this->userLookup = $userLookup;
 		$this->userSession = $userSession;
 		$this->client = $client;
-		$this->logger = $logger;
+		$this->logger = new Logger($logger);
 	}
 
 	/**
@@ -100,13 +100,16 @@ class LoginFlowController extends Controller {
 	 * @throws LoginException
 	 */
 	public function login() {
+		$this->logger->debug('Entering LoginFlowController::login');
 		$openid = $this->getOpenIdConnectClient();
 		if (!$openid) {
 			throw new HintException('Configuration issue in openidconnect app');
 		}
 		try {
+			$this->logger->debug('Before openid->authenticate');
 			$openid->authenticate();
 		} catch (OpenIDConnectClientException $ex) {
+			$this->logger->logException($ex);
 			throw new HintException('Error in OpenIdConnect:' . $ex->getMessage());
 		}
 		$this->logger->debug('Access token: ' . $openid->getAccessToken());
@@ -119,7 +122,6 @@ class LoginFlowController extends Controller {
 		$user = $this->userLookup->lookupUser($userInfo);
 
 		// trigger login process
-
 		if ($this->userSession->createSessionToken($this->request, $user->getUID(), $user->getUID()) &&
 			$this->userSession->loginUser($user, null)) {
 			$this->session->set('oca.openid-connect.id-token', $openid->getIdToken());
@@ -135,10 +137,11 @@ class LoginFlowController extends Controller {
 					->create('oca.openid-connect.sessions')
 					->set($sid, true);
 			} else {
-				\OC::$server->getLogger()->debug('Id token holds no sid: ' . \json_encode($openid->getIdTokenPayload()));
+				$this->logger->debug('Id token holds no sid: ' . \json_encode($openid->getIdTokenPayload()));
 			}
 			return new RedirectResponse($this->getDefaultUrl());
 		}
+		$this->logger->error("Unable to login {$user->getUID()}");
 		return new RedirectResponse('/');
 	}
 
@@ -155,25 +158,27 @@ class LoginFlowController extends Controller {
 		// fail fast if not configured
 		$openIdConfig = $this->client->getOpenIdConfig();
 		if ($openIdConfig === null) {
-			$this->logger->warning('OpenID::logout: OpenID is not properly configured', ['app' => 'OpenId']);
+			$this->logger->warning('OpenID::logout: OpenID is not properly configured');
 			return new Response();
 		}
 		// there is an active session -> logout
 		if ($this->userSession->isLoggedIn()) {
-			$this->logger->debug('OpenID::logout: There is an active session -> performing logout', ['app' => 'OpenId']);
+			$user = $this->userSession->getUser() ? $this->userSession->getUser()->getUID() : '-unknown-user-';
+			$this->logger->debug("OpenID::logout: There is an active session -> performing logout for $user");
 			// complete logout
 			$this->session->set('oca.openid-connect.within-logout', true);
 			$this->userSession->logout();
+		} else {
+			if ($iss === null || $sid === null) {
+				$this->logger->warning("OpenID::logout: missing parameters: iss={$iss} and sid={$sid} and no active session");
+			}
 		}
 		if ($iss === null || $sid === null) {
-			if (!$this->userSession->isLoggedIn()) {
-				$this->logger->warning("OpenID::logout: missing parameters: iss={$iss} and sid={$sid} and no active session", ['app' => 'OpenId']);
-			}
 			return new Response();
 		}
 		if (isset($openIdConfig['provider-url'])) {
 			if (!Util::isSameDomain($openIdConfig['provider-url'], $iss)) {
-				$this->logger->warning("OpenID::logout: iss {$iss} !== provider-url {$openIdConfig['provider-url']}", ['app' => 'OpenId']);
+				$this->logger->warning("OpenID::logout: iss {$iss} !== provider-url {$openIdConfig['provider-url']}");
 				return new Response();
 			}
 		}
@@ -182,7 +187,7 @@ class LoginFlowController extends Controller {
 			->create('oca.openid-connect.sessions')
 			->remove($sid);
 
-		$this->logger->warning("OpenID::logout: session terminated: iss={$iss} and sid={$sid}", ['app' => 'OpenId']);
+		$this->logger->warning("OpenID::logout: session terminated: iss={$iss} and sid={$sid}");
 
 		$resp = new Response();
 		$resp->setHeaders([

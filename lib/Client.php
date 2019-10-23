@@ -53,7 +53,7 @@ class Client extends OpenIDConnectClient {
 		$this->session = $session;
 		$this->config = $config;
 		$this->generator = $generator;
-		$this->logger = $logger;
+		$this->logger = new Logger($logger);
 
 		$openIdConfig = $this->getOpenIdConfig();
 		if ($openIdConfig === null) {
@@ -64,10 +64,7 @@ class Client extends OpenIDConnectClient {
 			$openIdConfig['client-id'],
 			$openIdConfig['client-secret']
 		);
-		$scopes = ['openid', 'profile', 'email'];
-		if (isset($openIdConfig['scopes'])) {
-			$scopes = $openIdConfig['scopes'];
-		}
+		$scopes = $openIdConfig['scopes'] ?? ['openid', 'profile', 'email'];
 		$this->addScope($scopes);
 
 		if ($this->config->getSystemValue('debug', false)) {
@@ -76,8 +73,6 @@ class Client extends OpenIDConnectClient {
 		}
 		// set config parameters in case well known is not supported
 		if (isset($openIdConfig['provider-params'])) {
-			$dump = \json_encode($openIdConfig['provider-params']);
-			$logger->info("Manual configuration of endpoints: {$dump}", ['app' => 'OpenID']);
 			$this->providerConfigParam($openIdConfig['provider-params']);
 		}
 		// set additional auth parameters
@@ -99,7 +94,7 @@ class Client extends OpenIDConnectClient {
 	public function getWellKnownConfig() {
 		if (!$this->wellKnownConfig) {
 			$well_known_config_url = \rtrim($this->getProviderURL(), '/') . '/.well-known/openid-configuration';
-			$this->wellKnownConfig = \json_decode($this->fetchURL($well_known_config_url));
+			$this->wellKnownConfig = \json_decode($this->fetchURL($well_known_config_url), false);
 		}
 		return $this->wellKnownConfig;
 	}
@@ -127,7 +122,7 @@ class Client extends OpenIDConnectClient {
 		return parent::fetchURL($url, $post_body, $headers);
 	}
 
-	public function authenticate() {
+	public function authenticate() : bool {
 		$redirectUrl = $this->generator->linkToRouteAbsolute('openidconnect.loginFlow.login');
 
 		$openIdConfig = $this->getOpenIdConfig();
