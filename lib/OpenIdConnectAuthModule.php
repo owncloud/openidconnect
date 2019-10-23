@@ -60,7 +60,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 								   UserLookupService $lookupService,
 								   Client $client) {
 		$this->manager = $manager;
-		$this->logger = $logger;
+		$this->logger = new Logger($logger);
 		$this->cacheFactory = $cacheFactory;
 		$this->client = $client;
 		$this->lookupService = $lookupService;
@@ -102,7 +102,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 			}
 			return null;
 		} catch (OpenIDConnectClientException $ex) {
-			$this->logger->logException($ex, ['app' => __CLASS__]);
+			$this->logger->logException($ex);
 			return null;
 		}
 	}

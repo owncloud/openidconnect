@@ -24,6 +24,9 @@ use OCP\SabrePluginEvent;
 use Sabre\DAV\Auth\Plugin;
 
 class Application extends App {
+	/** @var Logger */
+	private $logger;
+
 	public function __construct(array $urlParams = []) {
 		parent::__construct('openidconnect', $urlParams);
 	}
@@ -34,6 +37,7 @@ class Application extends App {
 	 */
 	public function boot() {
 		$server = $this->getContainer()->getServer();
+		$this->logger = new Logger($server->getLogger());
 		if (!\OC::$CLI && !$server->getMemCacheFactory()->isAvailable()) {
 			throw new \OC\HintException('A real distributed mem cache setup is required');
 		}
@@ -55,6 +59,8 @@ class Application extends App {
 				$components = \parse_url($server->getRequest()->getRequestUri());
 				$uri = $components['path'];
 				if (\substr($uri, -6) === '/login') {
+					$req = $server->getRequest()->getRequestUri();
+					$this->logger->debug("Redirecting to IdP - request url: $req");
 					$loginUrl =  $server->getURLGenerator()->linkToRoute('openidconnect.loginFlow.login');
 					\header('Location: ' . $loginUrl);
 					exit;
@@ -63,7 +69,7 @@ class Application extends App {
 		}
 		// Add event listener
 		$dispatcher = $server->getEventDispatcher();
-		$dispatcher->addListener('OCA\DAV\Connector\Sabre::authInit', function ($event) use ($server) {
+		$dispatcher->addListener('OCA\DAV\Connector\Sabre::authInit', static function ($event) use ($server) {
 			if ($event instanceof SabrePluginEvent) {
 				$authPlugin = $event->getServer()->getPlugin('auth');
 				if ($authPlugin instanceof Plugin) {
@@ -82,6 +88,7 @@ class Application extends App {
 	}
 
 	private function logout() {
+		$this->logger->error('Calling Application:logout');
 		$server = $this->getContainer()->getServer();
 
 		$server->getSession()->remove('oca.openid-connect.access-token');
@@ -103,7 +110,7 @@ class Application extends App {
 				->create('oca.openid-connect.sessions')
 				->get($sid);
 			if (!$sessionValid) {
-				\OC::$server->getLogger()->debug("Session $sid is no longer valid -> logout");
+				$this->logger->debug("Session $sid is no longer valid -> logout");
 				$this->logout();
 				return;
 			}
@@ -120,22 +127,25 @@ class Application extends App {
 		if ($accessToken === null) {
 			return;
 		}
+		$idToken = $server->getSession()->get('oca.openid-connect.id-token');
+
 		// register logout handler
-		$server->getEventDispatcher()->addListener('user.beforelogout', function () use ($client, $accessToken) {
+		$logger = $this->logger;
+		$server->getEventDispatcher()->addListener('user.beforelogout', static function () use ($client, $accessToken, $idToken, $logger) {
 			// only call if access token is still valid
 			try {
 				if (\OC::$server->getSession()->get('oca.openid-connect.within-logout') === true) {
-					\OC::$server->getLogger()->debug('OIDC Logout: revoking token' . $accessToken);
+					$logger->debug('OIDC Logout: revoking token' . $accessToken);
 					$revokeData = $client->revokeToken($accessToken);
-					\OC::$server->getLogger()->debug('Revocation info: ' . \json_encode($revokeData));
+					$logger->debug('Revocation info: ' . \json_encode($revokeData));
 					\OC::$server->getSession()->remove('oca.openid-connect.access-token');
 					\OC::$server->getSession()->remove('oca.openid-connect.refresh-token');
 				} else {
-					\OC::$server->getLogger()->debug('OIDC Logout: ending session ' . $accessToken);
-					$client->signOut($accessToken, null);
+					$logger->debug('OIDC Logout: ending session ' . $accessToken . ' id: ' . $idToken);
+					$client->signOut($idToken, null);
 				}
 			} catch (OpenIDConnectClientException $ex) {
-				\OC::$server->getLogger()->logException($ex);
+				$logger->logException($ex);
 			}
 		});
 
@@ -152,14 +162,14 @@ class Application extends App {
 			$introspectionClientSecret = isset($client->getOpenIdConfig()['token-introspection-endpoint-client-secret']) ? $client->getOpenIdConfig()['token-introspection-endpoint-client-secret'] : null;
 
 			$introData = $client->introspectToken($accessToken, '', $introspectionClientId, $introspectionClientSecret);
-			\OC::$server->getLogger()->debug('Introspection info: ' . \json_encode($introData) . ' for access token:' . $accessToken);
+			$this->logger->debug('Introspection info: ' . \json_encode($introData) . ' for access token:' . $accessToken);
 			if (\property_exists($introData, 'error')) {
-				\OC::$server->getLogger()->error('Token introspection failed: ' . \json_encode($introData));
+				$this->logger->error('Token introspection failed: ' . \json_encode($introData));
 				$this->logout();
 				throw new \OC\HintException("Verifying token failed: {$introData->error}");
 			}
 			if (!$introData->active) {
-				\OC::$server->getLogger()->error('Token (as per introspection) is inactive: ' . \json_encode($introData));
+				$this->logger->error('Token (as per introspection) is inactive: ' . \json_encode($introData));
 				$this->logout();
 				return;
 			}
@@ -169,7 +179,7 @@ class Application extends App {
 		} else {
 			$client->verifyJWTsignature($accessToken);
 			$payload = $client->getAccessTokenPayload();
-			\OC::$server->getLogger()->debug('Access token payload: ' . \json_encode($payload) . ' for access token:' . $accessToken);
+			$this->logger->debug('Access token payload: ' . \json_encode($payload) . ' for access token:' . $accessToken);
 
 			$this->getCache()->set($accessToken, $payload->exp);
 			/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
@@ -204,14 +214,15 @@ class Application extends App {
 			if ($refreshToken) {
 				$response = $client->refreshToken($refreshToken);
 				if ($response->error) {
-					\OC::$server->getLogger()->error("Refresh token failed: {$response->error_description}");
+					$this->logger->error("Refresh token failed: {$response->error_description}");
 					$this->logout();
 					throw new \OC\HintException($response->error_description);
 				}
+				$server->getSession()->set('oca.openid-connect.id-token', $client->getIdToken());
 				$server->getSession()->set('oca.openid-connect.access-token', $client->getAccessToken());
 				$server->getSession()->set('oca.openid-connect.refresh-token', $client->getRefreshToken());
 			} else {
-				\OC::$server->getLogger()->debug('No refresh token available -> nothing to do. We will be kicked out as soon as the access token expires.');
+				$this->logger->debug('No refresh token available -> nothing to do. We will be kicked out as soon as the access token expires.');
 			}
 		}
 	}
