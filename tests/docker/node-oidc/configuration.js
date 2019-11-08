@@ -32,7 +32,15 @@ module.exports = Object.assign({
   	  grant_types: ['refresh_token', 'authorization_code'],
       redirect_uris: ['http://10.254.254.254:8300/oidc-callback.html'],
 	  token_endpoint_auth_method: 'none'
-  }
+  },
+      {
+      application_type: 'native',
+      client_id: 'xdXOt13JKxym1B1QcEncf2XDkLAexMBFwiT9j6EfhhHFJhs2KM9jbjTmf8JBXE69',
+      client_secret: 'UBntmLjC2yYCeHwsyj73Uwo9TAaecAetRwMw0xYcvNL9yRdLSUi0hUAHfvCHFeFh',
+      grant_types: ['refresh_token', 'authorization_code'],
+      redirect_uris: ['http://localhost'],
+    },
+
 ],
   cookies: {
     long: { signed: true, maxAge: (1 * 24 * 60 * 60) * 1000 }, // 1 day in ms
