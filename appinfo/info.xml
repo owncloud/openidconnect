@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <info>
     <id>openidconnect</id>
-    <name>OpenId Connect</name>
-    <summary>OpenId Connect Integration</summary>
-    <description>bla bla bla</description>
+    <name>OpenID Connect</name>
+    <summary>OpenID Connect Integration</summary>
+    <description>OpenID Connect Integration with ownCloud</description>
     <licence>AGPL</licence>
     <author>Thomas Müller</author>
     <version>0.1.0</version>
