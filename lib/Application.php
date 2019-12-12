@@ -140,6 +140,7 @@ class Application extends App {
 					$logger->debug('Revocation info: ' . \json_encode($revokeData));
 					\OC::$server->getSession()->remove('oca.openid-connect.access-token');
 					\OC::$server->getSession()->remove('oca.openid-connect.refresh-token');
+					\OC::$server->getSession()->remove('oca.openid-connect.id-token');
 				} else {
 					$logger->debug('OIDC Logout: ending session ' . $accessToken . ' id: ' . $idToken);
 					$client->signOut($idToken, null);

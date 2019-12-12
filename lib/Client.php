@@ -133,4 +133,15 @@ class Client extends OpenIDConnectClient {
 		$this->setRedirectURL($redirectUrl);
 		return parent::authenticate();
 	}
+
+	public function signOut($accessToken, $redirect) : void {
+		$postLogoutRedirectUri = null;
+		$openIdConfig = $this->getOpenIdConfig();
+		$usePostLogoutRedirectUri = $openIdConfig['post-logout-redirect-uri'] ?? false;
+		if ($usePostLogoutRedirectUri) {
+			$postLogoutRedirectUri = $this->generator->getAbsoluteURL('/');
+		}
+
+		parent::signOut($accessToken, $postLogoutRedirectUri);
+	}
 }

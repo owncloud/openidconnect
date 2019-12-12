@@ -1,5 +1,6 @@
 parameters:
+  autoload_directories:
+    - lib
   bootstrap: %currentWorkingDirectory%/../../lib/base.php
   ignoreErrors:
-    - '#Access to an undefined property object::\$exp#'
-    - '#Parameter \#2 \$redirect of method Jumbojett\\OpenIDConnectClient::signOut\(\) expects string, null given.#'
+    - '#Parameter \#2 \$redirect of method OCA\\OpenIdConnect\\Client::signOut\(\) expects string, null given.#'
