@@ -131,19 +131,21 @@ class Application extends App {
 
 		// register logout handler
 		$logger = $this->logger;
-		$server->getEventDispatcher()->addListener('user.beforelogout', static function () use ($client, $accessToken, $idToken, $logger) {
+		$server->getEventDispatcher()->addListener('user.afterlogout', static function () use ($client, $accessToken, $idToken, $logger) {
 			// only call if access token is still valid
 			try {
-				if (\OC::$server->getSession()->get('oca.openid-connect.within-logout') === true) {
-					$logger->debug('OIDC Logout: revoking token' . $accessToken);
-					$revokeData = $client->revokeToken($accessToken);
-					$logger->debug('Revocation info: ' . \json_encode($revokeData));
-					\OC::$server->getSession()->remove('oca.openid-connect.access-token');
-					\OC::$server->getSession()->remove('oca.openid-connect.refresh-token');
-				} else {
-					$logger->debug('OIDC Logout: ending session ' . $accessToken . ' id: ' . $idToken);
-					$client->signOut($idToken, null);
-				}
+				$logger->debug('OIDC Logout: revoking token' . $accessToken);
+				$revokeData = $client->revokeToken($accessToken);
+				$logger->debug('Revocation info: ' . \json_encode($revokeData));
+			} catch (OpenIDConnectClientException $ex) {
+				$logger->logException($ex);
+			}
+			try {
+				\OC::$server->getSession()->remove('oca.openid-connect.access-token');
+				\OC::$server->getSession()->remove('oca.openid-connect.refresh-token');
+				\OC::$server->getSession()->remove('oca.openid-connect.id-token');
+				$logger->debug('OIDC Logout: ending session ' . $accessToken . ' id: ' . $idToken);
+				$client->signOut($idToken, null);
 			} catch (OpenIDConnectClientException $ex) {
 				$logger->logException($ex);
 			}

@@ -14,7 +14,6 @@
     <repository type="git">https://github.com/owncloud/openidconnect.git</repository>
     <dependencies>
         <owncloud min-version="10" max-version="10"/>
-        <php min-version="7.0" />
     </dependencies>
     <types>
         <authentication/>

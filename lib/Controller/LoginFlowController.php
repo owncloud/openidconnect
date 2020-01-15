@@ -166,7 +166,6 @@ class LoginFlowController extends Controller {
 			$user = $this->userSession->getUser() ? $this->userSession->getUser()->getUID() : '-unknown-user-';
 			$this->logger->debug("OpenID::logout: There is an active session -> performing logout for $user");
 			// complete logout
-			$this->session->set('oca.openid-connect.within-logout', true);
 			$this->userSession->logout();
 		} else {
 			if ($iss === null || $sid === null) {
