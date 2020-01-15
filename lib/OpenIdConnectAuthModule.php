@@ -19,6 +19,7 @@ use Jumbojett\OpenIDConnectClientException;
 use OC\User\LoginException;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\Authentication\IAuthModule;
+use OCP\ICache;
 use OCP\ICacheFactory;
 use OCP\ILogger;
 use OCP\IRequest;
@@ -67,9 +68,11 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	}
 
 	/**
-	 * @inheritdoc
+	 * @param IRequest $request
+	 * @return IUser|null
+	 * @throws LoginException
 	 */
-	public function auth(IRequest $request) {
+	public function auth(IRequest $request): ?IUser {
 		$authHeader = $request->getHeader('Authorization');
 		if (\strpos($authHeader, 'Bearer ') === false) {
 			return null;
@@ -78,7 +81,12 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		return $this->authToken($bearerToken);
 	}
 
-	public function authToken(string $bearerToken) {
+	/**
+	 * @param string $bearerToken
+	 * @return IUser|null
+	 * @throws LoginException
+	 */
+	public function authToken(string $bearerToken): ?IUser {
 		try {
 			if ($this->client->getOpenIdConfig() === null) {
 				return null;
@@ -107,9 +115,6 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		}
 	}
 
-	/**
-	 * @inheritdoc
-	 */
 	public function getUserPassword(IRequest $request) {
 		return '';
 	}
@@ -124,9 +129,11 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		if ($userInfo) {
 			return $userInfo['exp'];
 		}
-		if ($this->client->getOpenIdConfig()['use-token-introspection-endpoint']) {
-			$introspectionClientId = isset($this->client->getOpenIdConfig()['token-introspection-endpoint-client-id']) ? $this->client->getOpenIdConfig()['token-introspection-endpoint-client-id'] : null;
-			$introspectionClientSecret = isset($this->client->getOpenIdConfig()['token-introspection-endpoint-client-secret']) ? $this->client->getOpenIdConfig()['token-introspection-endpoint-client-secret'] : null;
+		$config = $this->client->getOpenIdConfig();
+		$useIntrospectionEndpoint = $config['use-token-introspection-endpoint'] ?? false;
+		if ($useIntrospectionEndpoint) {
+			$introspectionClientId = $config['token-introspection-endpoint-client-id'] ?? null;
+			$introspectionClientSecret = $config['token-introspection-endpoint-client-secret'] ?? null;
 
 			$introData = $this->client->introspectToken($bearerToken, '', $introspectionClientId, $introspectionClientSecret);
 			$this->logger->debug('Introspection info: ' . \json_encode($introData));
@@ -152,9 +159,9 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	}
 
 	/**
-	 * @return \OCP\ICache
+	 * @return ICache
 	 */
-	private function getCache(): \OCP\ICache {
+	private function getCache(): ICache {
 		return $this->cacheFactory->create('oca.openid-connect');
 	}
 
@@ -181,7 +188,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	 * @param IUser $user
 	 * @param int $expiry
 	 */
-	private function updateCache($bearerToken, IUser $user, $expiry) {
+	private function updateCache($bearerToken, IUser $user, $expiry): void {
 		$cache = $this->getCache();
 		$cache->set($bearerToken, [
 			'uid' => $user->getUID(),
