@@ -15,8 +15,10 @@
  */
 namespace OCA\OpenIdConnect\Service;
 
+use OC\HintException;
 use OC\User\LoginException;
 use OCA\OpenIdConnect\Client;
+use OCP\IUser;
 use OCP\IUserManager;
 
 class UserLookupService {
@@ -38,19 +40,20 @@ class UserLookupService {
 
 	/**
 	 * @param mixed $userInfo
-	 * @return \OCP\IUser
+	 * @return IUser
 	 * @throws LoginException
+	 * @throws HintException
 	 */
-	public function lookupUser($userInfo) {
+	public function lookupUser($userInfo): IUser {
 		$openIdConfig = $this->client->getOpenIdConfig();
+		if ($openIdConfig === null) {
+			throw new HintException('Configuration issue in openidconnect app');
+		}
 		$searchByEmail = true;
 		if (isset($openIdConfig['mode']) && $openIdConfig['mode'] === 'userid') {
 			$searchByEmail = false;
 		}
-		$attribute = 'email';
-		if (isset($openIdConfig['search-attribute'])) {
-			$attribute = $openIdConfig['search-attribute'];
-		}
+		$attribute = $openIdConfig['search-attribute'] ?? 'email';
 
 		if ($searchByEmail) {
 			$user = $this->userManager->getByEmail($userInfo->$attribute);
