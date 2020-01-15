@@ -17,7 +17,6 @@ namespace OCA\OpenIdConnect;
 
 use Jumbojett\OpenIDConnectClient;
 use OCP\IConfig;
-use OCP\ILogger;
 use OCP\ISession;
 use OCP\IURLGenerator;
 
@@ -33,10 +32,6 @@ class Client extends OpenIDConnectClient {
 	 * @var IURLGenerator
 	 */
 	private $generator;
-	/**
-	 * @var ILogger
-	 */
-	private $logger;
 
 	/**
 	 * Client constructor.
@@ -44,16 +39,14 @@ class Client extends OpenIDConnectClient {
 	 * @param IConfig $config
 	 * @param IURLGenerator $generator
 	 * @param ISession $session
-	 * @param ILogger $logger
 	 */
 	public function __construct(IConfig $config,
 								IURLGenerator $generator,
-								ISession $session,
-								ILogger $logger) {
+								ISession $session
+	) {
 		$this->session = $session;
 		$this->config = $config;
 		$this->generator = $generator;
-		$this->logger = new Logger($logger);
 
 		$openIdConfig = $this->getOpenIdConfig();
 		if ($openIdConfig === null) {
