@@ -30,7 +30,19 @@ config = {
 			'phpVersions': [
 				'7.1',
 			],
+            'databases': [
+                'mariadb:10.2', 'mysql:5.5', 'mysql:5.7', 'postgres:9.4', 'oracle'
+            ],
 			'coverage': False
+		},
+		'codecov' : {
+			'phpVersions': [
+				'7.1',
+			],
+            'databases': [
+                'sqlite'
+            ],
+			'coverage': True
 		},
 		'reducedDatabases' : {
 			'phpVersions': [
