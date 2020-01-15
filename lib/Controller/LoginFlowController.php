@@ -26,6 +26,7 @@ use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\Response;
+use OCP\ICacheFactory;
 use OCP\ILogger;
 use OCP\IRequest;
 use OCP\ISession;
@@ -54,6 +55,10 @@ class LoginFlowController extends Controller {
 	 * @var ILogger
 	 */
 	private $logger;
+	/**
+	 * @var ICacheFactory
+	 */
+	private $memCacheFactory;
 
 	public function __construct(string $appName,
 								IRequest $request,
@@ -61,7 +66,9 @@ class LoginFlowController extends Controller {
 								IUserSession $userSession,
 								ISession $session,
 								ILogger $logger,
-								Client $client) {
+								Client $client,
+								ICacheFactory $memCacheFactory
+	) {
 		parent::__construct($appName, $request);
 		if (!$userSession instanceof Session) {
 			throw new \Exception('We rely on internal implementation!');
@@ -72,6 +79,7 @@ class LoginFlowController extends Controller {
 		$this->userSession = $userSession;
 		$this->client = $client;
 		$this->logger = new Logger($logger);
+		$this->memCacheFactory = $memCacheFactory;
 	}
 
 	/**
@@ -99,7 +107,7 @@ class LoginFlowController extends Controller {
 	 * @throws \Jumbojett\OpenIDConnectClientException
 	 * @throws LoginException
 	 */
-	public function login() {
+	public function login(): RedirectResponse {
 		$this->logger->debug('Entering LoginFlowController::login');
 		$openid = $this->getOpenIdConnectClient();
 		if (!$openid) {
@@ -133,7 +141,7 @@ class LoginFlowController extends Controller {
 				/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
 				$sid = $openid->getIdTokenPayload()->sid;
 				$this->session->set('oca.openid-connect.session-id', $sid);
-				\OC::$server->getMemCacheFactory()
+				$this->memCacheFactory
 					->create('oca.openid-connect.sessions')
 					->set($sid, true);
 			} else {
@@ -154,7 +162,7 @@ class LoginFlowController extends Controller {
 	 * @param string|null $sid
 	 * @return Response
 	 */
-	public function logout($iss = null, $sid = null) {
+	public function logout($iss = null, $sid = null): Response {
 		// fail fast if not configured
 		$openIdConfig = $this->client->getOpenIdConfig();
 		if ($openIdConfig === null) {
@@ -182,7 +190,7 @@ class LoginFlowController extends Controller {
 			}
 		}
 
-		\OC::$server->getMemCacheFactory()
+		$this->memCacheFactory
 			->create('oca.openid-connect.sessions')
 			->remove($sid);
 
@@ -199,7 +207,7 @@ class LoginFlowController extends Controller {
 	/**
 	 * @return string
 	 */
-	protected function getDefaultUrl() {
+	protected function getDefaultUrl(): string {
 		return \OC_Util::getDefaultPageUrl();
 	}
 
