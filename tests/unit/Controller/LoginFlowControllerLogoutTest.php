@@ -4,6 +4,7 @@ namespace OCA\OpenIdConnect\Tests\Unit\Controller;
 
 use Jumbojett\OpenIDConnectClientException;
 use OC\HintException;
+use OC\Memcache\ArrayCache;
 use OC\User\LoginException;
 use OC\User\Session;
 use OCA\OpenIdConnect\Client;
@@ -89,5 +90,20 @@ class LoginFlowControllerLogoutTest extends TestCase {
 		$this->userSession->expects(self::once())->method('logout');
 
 		$this->controller->logout();
+	}
+
+	public function testLogoutInvalidIssuer(): void {
+		$this->client->method('getOpenIdConfig')->willReturn(['provider-url' => 'https://example.net']);
+		$this->logger->expects(self::once())->method('warning')->with('OpenID::logout: iss https://example.com !== provider-url https://example.net');
+
+		$this->controller->logout('https://example.com', 'SID-12345678');
+	}
+
+	public function testLogoutValidIssuer(): void {
+		$this->client->method('getOpenIdConfig')->willReturn(['provider-url' => 'https://example.com']);
+		$this->memCacheFactory->expects(self::once())->method('create')->willReturn(new ArrayCache());
+		$this->logger->expects(self::once())->method('warning')->with('OpenID::logout: session terminated: iss=https://example.com and sid=SID-12345678');
+
+		$this->controller->logout('https://example.com', 'SID-12345678');
 	}
 }
