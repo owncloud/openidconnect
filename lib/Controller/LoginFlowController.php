@@ -88,7 +88,7 @@ class LoginFlowController extends Controller {
 	 * @PublicPage
 	 * @CORS
 	 */
-	public function config() {
+	public function config(): JSONResponse {
 		$openid = $this->getOpenIdConnectClient();
 		if (!$openid) {
 			return new JSONResponse([]);
