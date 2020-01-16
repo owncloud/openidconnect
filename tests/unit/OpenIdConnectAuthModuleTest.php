@@ -5,6 +5,7 @@ namespace OCA\OpenIdConnect\Tests\Unit;
 use Jumbojett\OpenIDConnectClientException;
 use OC\HintException;
 use OC\Memcache\ArrayCache;
+use OC\User\LoginException;
 use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\OpenIdConnectAuthModule;
 use OCA\OpenIdConnect\Service\UserLookupService;
@@ -103,7 +104,7 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		self::assertNull($return);
 	}
 
-	public function testExpiredTokenWithIntrospection(): void {
+	public function testValidTokenWithIntrospection(): void {
 		$this->client->method('getOpenIdConfig')->willReturn(['use-token-introspection-endpoint' => true]);
 		$this->client->method('introspectToken')->willReturn((object)['active' => true, 'exp' => \time() + 3600]);
 		$this->client->method('requestUserInfo')->willReturn((object)['email' => 'foo@example.com']);
@@ -115,5 +116,20 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 
 		$return = $this->authModule->auth($request);
 		self::assertEquals($user, $return);
+	}
+
+	public function testExpiredCachedToken(): void {
+		$this->expectException(LoginException::class);
+		$this->expectExceptionMessage('OpenID Connect token expired');
+
+		$cache = new ArrayCache();
+		$cache->set(1234567890, ['exp' => \time() - 5]);
+
+		$this->client->method('getOpenIdConfig')->willReturn([]);
+		$this->cacheFactory->method('create')->willReturn($cache);
+		$request = $this->createMock(IRequest::class);
+		$request->method('getHeader')->willReturn('Bearer 1234567890');
+
+		$this->authModule->auth($request);
 	}
 }

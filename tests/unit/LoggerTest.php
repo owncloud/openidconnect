@@ -32,6 +32,7 @@ class LoggerTest extends TestCase {
 		return [
 			['alert'],
 			['critical'],
+			['emergency'],
 			['error'],
 			['warning'],
 			['notice'],
