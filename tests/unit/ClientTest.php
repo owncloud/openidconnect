@@ -33,7 +33,7 @@ class ClientTest extends TestCase {
 		$this->config = $this->createMock(IConfig::class);
 		$this->urlGenerator = $this->createMock(IURLGenerator::class);
 		$this->session = $this->createMock(ISession::class);
-//		$this->client = new Client($this->config, $this->urlGenerator, $this->session);
+
 		$this->client = $this->getMockBuilder(Client::class)
 			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session])
 			->setMethods(['fetchURL'])
@@ -51,5 +51,33 @@ class ClientTest extends TestCase {
 		$this->client->expects(self::once())->method('fetchURL')->with('https://example.net/.well-known/openid-configuration')->willReturn('{"foo": "bar"}');
 		$return = $this->client->getWellKnownConfig();
 		self::assertEquals((object)['foo' => 'bar'], $return);
+	}
+
+	public function testCtor(): void {
+		$providerUrl = 'https://example.net';
+		$debug = true;
+
+		$this->config->method('getSystemValue')->willReturnCallback(static function ($key) use ($debug, $providerUrl) {
+			if ($key === 'openid-connect') {
+				return [
+					'provider-url' => $providerUrl,
+					'client-id' => 'client-id',
+					'client-secret' => 'secret',
+					'scopes' => ['openid', 'profile']
+				];
+			}
+			if ($key === 'debug') {
+				return $debug;
+			}
+			throw new \InvalidArgumentException("Unexpected key: $key");
+		});
+		$this->client = $this->getMockBuilder(Client::class)
+			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session])
+			->setMethods(['fetchURL'])
+			->getMock();
+
+		self::assertEquals($providerUrl, $this->client->getProviderURL());
+		self::assertEquals(false, $this->client->getVerifyHost());
+		self::assertEquals(false, $this->client->getVerifyPeer());
 	}
 }
