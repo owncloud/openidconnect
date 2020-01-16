@@ -20,12 +20,8 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use Jumbojett\OpenIDConnectClientException;
 use OC;
 use OC\HintException;
-use OCA\OpenIdConnect\Sabre\OpenIdSabreAuthPlugin;
 use OCP\AppFramework\App;
 use OCP\ICache;
-use OCP\IServerContainer;
-use OCP\SabrePluginEvent;
-use Sabre\DAV\Auth\Plugin;
 
 class Application extends App {
 	/** @var Logger */
@@ -38,6 +34,7 @@ class Application extends App {
 	/**
 	 * @throws OpenIDConnectClientException
 	 * @throws HintException
+	 * @codeCoverageIgnore
 	 */
 	public function boot(): void {
 		$server = $this->getContainer()->getServer();
@@ -51,6 +48,7 @@ class Application extends App {
 		if ($openIdConfig === null) {
 			return;
 		}
+		$session = $server->getSession();
 		$userSession = $server->getUserSession();
 		$urlGenerator = $server->getURLGenerator();
 		$request = $server->getRequest();
@@ -58,7 +56,8 @@ class Application extends App {
 		$loginPage->handleLoginPageBehaviour($openIdConfig);
 
 		// Add event listener
-		$this->registerEventHandler($server);
+		$eventHandler = new EventHandler($server->getEventDispatcher(), $request, $userSession, $session);
+		$eventHandler->registerEventHandler();
 
 		$this->verifySession();
 	}
@@ -69,6 +68,7 @@ class Application extends App {
 
 		$server->getSession()->remove('oca.openid-connect.access-token');
 		$server->getSession()->remove('oca.openid-connect.refresh-token');
+		$server->getSession()->remove('oca.openid-connect.id-token');
 		$server->getUserSession()->logout();
 	}
 
@@ -203,26 +203,5 @@ class Application extends App {
 				$this->logger->debug('No refresh token available -> nothing to do. We will be kicked out as soon as the access token expires.');
 			}
 		}
-	}
-
-	/**
-	 * @param IServerContainer $server
-	 */
-	protected function registerEventHandler(IServerContainer $server): void {
-		$dispatcher = $server->getEventDispatcher();
-		$dispatcher->addListener('OCA\DAV\Connector\Sabre::authInit', static function ($event) use ($server) {
-			if ($event instanceof SabrePluginEvent) {
-				$authPlugin = $event->getServer()->getPlugin('auth');
-				if ($authPlugin instanceof Plugin) {
-					$authPlugin->addBackend(
-						new OpenIdSabreAuthPlugin($server->getSession(),
-							$server->getUserSession(),
-							$server->getRequest(),
-							$server->query(OpenIdConnectAuthModule::class),
-							'principals/')
-					);
-				}
-			}
-		});
 	}
 }
