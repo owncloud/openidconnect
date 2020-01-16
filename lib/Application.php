@@ -18,8 +18,12 @@ namespace OCA\OpenIdConnect;
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Jumbojett\OpenIDConnectClientException;
+use OC;
+use OC\HintException;
 use OCA\OpenIdConnect\Sabre\OpenIdSabreAuthPlugin;
 use OCP\AppFramework\App;
+use OCP\ICache;
+use OCP\IServerContainer;
 use OCP\SabrePluginEvent;
 use Sabre\DAV\Auth\Plugin;
 
@@ -33,13 +37,13 @@ class Application extends App {
 
 	/**
 	 * @throws OpenIDConnectClientException
-	 * @throws \OC\HintException
+	 * @throws HintException
 	 */
-	public function boot() {
+	public function boot(): void {
 		$server = $this->getContainer()->getServer();
 		$this->logger = new Logger($server->getLogger());
-		if (!\OC::$CLI && !$server->getMemCacheFactory()->isAvailable()) {
-			throw new \OC\HintException('A real distributed mem cache setup is required');
+		if (!OC::$CLI && !$server->getMemCacheFactory()->isAvailable()) {
+			throw new HintException('A real distributed mem cache setup is required');
 		}
 
 		$client = $this->getClient();
@@ -47,47 +51,19 @@ class Application extends App {
 		if ($openIdConfig === null) {
 			return;
 		}
-		// register alternative login
-		$loginName = isset($openIdConfig['loginButtonName']) ? $openIdConfig['loginButtonName'] : 'OpenId';
-		\OC_App::registerLogIn([
-			'name' => $loginName,
-			'href' => $server->getURLGenerator()->linkToRoute('openidconnect.loginFlow.login'),
-		]);
-		// TODO: if configured perform redirect right away if not logged in ....
-		if (isset($openIdConfig['autoRedirectOnLoginPage']) && $openIdConfig['autoRedirectOnLoginPage'] === true) {
-			if (!$server->getUserSession()->isLoggedIn()) {
-				$components = \parse_url($server->getRequest()->getRequestUri());
-				$uri = $components['path'];
-				if (\substr($uri, -6) === '/login') {
-					$req = $server->getRequest()->getRequestUri();
-					$this->logger->debug("Redirecting to IdP - request url: $req");
-					$loginUrl =  $server->getURLGenerator()->linkToRoute('openidconnect.loginFlow.login');
-					\header('Location: ' . $loginUrl);
-					exit;
-				}
-			}
-		}
+		$userSession = $server->getUserSession();
+		$urlGenerator = $server->getURLGenerator();
+		$request = $server->getRequest();
+		$loginPage = new LoginPageBehaviour($this->logger, $userSession, $urlGenerator, $request);
+		$loginPage->handleLoginPageBehaviour($openIdConfig);
+
 		// Add event listener
-		$dispatcher = $server->getEventDispatcher();
-		$dispatcher->addListener('OCA\DAV\Connector\Sabre::authInit', static function ($event) use ($server) {
-			if ($event instanceof SabrePluginEvent) {
-				$authPlugin = $event->getServer()->getPlugin('auth');
-				if ($authPlugin instanceof Plugin) {
-					$authPlugin->addBackend(
-						new OpenIdSabreAuthPlugin($server->getSession(),
-							$server->getUserSession(),
-							$server->getRequest(),
-							$server->query(OpenIdConnectAuthModule::class),
-							'principals/')
-					);
-				}
-			}
-		});
+		$this->registerEventHandler($server);
 
 		$this->verifySession();
 	}
 
-	private function logout() {
+	private function logout(): void {
 		$this->logger->error('Calling Application:logout');
 		$server = $this->getContainer()->getServer();
 
@@ -97,10 +73,10 @@ class Application extends App {
 	}
 
 	/**
-	 * @throws \OC\HintException
-	 * @throws \Jumbojett\OpenIDConnectClientException
+	 * @throws HintException
+	 * @throws OpenIDConnectClientException
 	 */
-	private function verifySession() {
+	private function verifySession(): void {
 		$server = $this->getContainer()->getServer();
 
 		// verify open id token/session
@@ -141,9 +117,9 @@ class Application extends App {
 				$logger->logException($ex);
 			}
 			try {
-				\OC::$server->getSession()->remove('oca.openid-connect.access-token');
-				\OC::$server->getSession()->remove('oca.openid-connect.refresh-token');
-				\OC::$server->getSession()->remove('oca.openid-connect.id-token');
+				OC::$server->getSession()->remove('oca.openid-connect.access-token');
+				OC::$server->getSession()->remove('oca.openid-connect.refresh-token');
+				OC::$server->getSession()->remove('oca.openid-connect.id-token');
 				$logger->debug('OIDC Logout: ending session ' . $accessToken . ' id: ' . $idToken);
 				$client->signOut($idToken, null);
 			} catch (OpenIDConnectClientException $ex) {
@@ -160,15 +136,15 @@ class Application extends App {
 
 		$client->setAccessToken($accessToken);
 		if ($client->getOpenIdConfig()['use-token-introspection-endpoint']) {
-			$introspectionClientId = isset($client->getOpenIdConfig()['token-introspection-endpoint-client-id']) ? $client->getOpenIdConfig()['token-introspection-endpoint-client-id'] : null;
-			$introspectionClientSecret = isset($client->getOpenIdConfig()['token-introspection-endpoint-client-secret']) ? $client->getOpenIdConfig()['token-introspection-endpoint-client-secret'] : null;
+			$introspectionClientId = $client->getOpenIdConfig()['token-introspection-endpoint-client-id'] ?? null;
+			$introspectionClientSecret = $client->getOpenIdConfig()['token-introspection-endpoint-client-secret'] ?? null;
 
 			$introData = $client->introspectToken($accessToken, '', $introspectionClientId, $introspectionClientSecret);
 			$this->logger->debug('Introspection info: ' . \json_encode($introData) . ' for access token:' . $accessToken);
 			if (\property_exists($introData, 'error')) {
 				$this->logger->error('Token introspection failed: ' . \json_encode($introData));
 				$this->logout();
-				throw new \OC\HintException("Verifying token failed: {$introData->error}");
+				throw new HintException("Verifying token failed: {$introData->error}");
 			}
 			if (!$introData->active) {
 				$this->logger->error('Token (as per introspection) is inactive: ' . \json_encode($introData));
@@ -197,16 +173,16 @@ class Application extends App {
 		return $server->query(Client::class);
 	}
 
-	private function getCache(): \OCP\ICache {
+	private function getCache(): ICache {
 		return $this->getContainer()->getServer()->getMemCacheFactory()->create('oca.openid-connect');
 	}
 
 	/**
 	 * @param int $exp
-	 * @throws \Jumbojett\OpenIDConnectClientException
-	 * @throws \OC\HintException
+	 * @throws OpenIDConnectClientException
+	 * @throws HintException
 	 */
-	private function refreshToken($exp) {
+	private function refreshToken($exp): void {
 		$server = $this->getContainer()->getServer();
 		$client = $this->getClient();
 
@@ -218,7 +194,7 @@ class Application extends App {
 				if ($response->error) {
 					$this->logger->error("Refresh token failed: {$response->error_description}");
 					$this->logout();
-					throw new \OC\HintException($response->error_description);
+					throw new HintException($response->error_description);
 				}
 				$server->getSession()->set('oca.openid-connect.id-token', $client->getIdToken());
 				$server->getSession()->set('oca.openid-connect.access-token', $client->getAccessToken());
@@ -227,5 +203,26 @@ class Application extends App {
 				$this->logger->debug('No refresh token available -> nothing to do. We will be kicked out as soon as the access token expires.');
 			}
 		}
+	}
+
+	/**
+	 * @param IServerContainer $server
+	 */
+	protected function registerEventHandler(IServerContainer $server): void {
+		$dispatcher = $server->getEventDispatcher();
+		$dispatcher->addListener('OCA\DAV\Connector\Sabre::authInit', static function ($event) use ($server) {
+			if ($event instanceof SabrePluginEvent) {
+				$authPlugin = $event->getServer()->getPlugin('auth');
+				if ($authPlugin instanceof Plugin) {
+					$authPlugin->addBackend(
+						new OpenIdSabreAuthPlugin($server->getSession(),
+							$server->getUserSession(),
+							$server->getRequest(),
+							$server->query(OpenIdConnectAuthModule::class),
+							'principals/')
+					);
+				}
+			}
+		});
 	}
 }
