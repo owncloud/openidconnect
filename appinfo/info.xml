@@ -4,7 +4,7 @@
     <name>OpenID Connect</name>
     <summary>OpenID Connect Integration</summary>
     <description>OpenID Connect Integration with ownCloud</description>
-    <licence>AGPL</licence>
+    <licence>GPLv2</licence>
     <author>Thomas Müller</author>
     <version>0.1.0</version>
     <namespace>OpenIdConnect</namespace>
