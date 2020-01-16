@@ -19,7 +19,7 @@ endif
 app_name=openidconnect
 build_dir=$(CURDIR)/build
 dist_dir=$(build_dir)/dist
-src_files=README.md LICENSE.md
+src_files=README.md LICENSE
 src_dirs=appinfo img lib vendor
 all_src=$(src_dirs) $(src_files)
 
