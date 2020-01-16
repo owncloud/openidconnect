@@ -92,29 +92,50 @@ class Client extends OpenIDConnectClient {
 		return $this->wellKnownConfig;
 	}
 
+	/**
+	 * @codeCoverageIgnore
+	 */
 	protected function startSession() {
 	}
 
+	/**
+	 * @codeCoverageIgnore
+	 */
 	protected function setSessionKey($key, $value) {
 		$this->session->set($key, $value);
 	}
 
+	/**
+	 * @codeCoverageIgnore
+	 */
 	protected function getSessionKey($key) {
 		return $this->session->get($key);
 	}
 
+	/**
+	 * @codeCoverageIgnore
+	 */
 	protected function unsetSessionKey($key) {
 		$this->session->remove($key);
 	}
 
+	/**
+	 * @codeCoverageIgnore
+	 */
 	protected function commitSession() {
 	}
 
+	/**
+	 * @codeCoverageIgnore
+	 */
 	protected function fetchURL($url, $post_body = null, $headers = []) {
 		// TODO: see how to use ownCloud HttpClient ....
 		return parent::fetchURL($url, $post_body, $headers);
 	}
 
+	/**
+	 * @codeCoverageIgnore
+	 */
 	public function authenticate() : bool {
 		$redirectUrl = $this->generator->linkToRouteAbsolute('openidconnect.loginFlow.login');
 
