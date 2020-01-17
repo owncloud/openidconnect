@@ -137,6 +137,21 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		self::assertEquals($user, $return);
 	}
 
+	public function testValidTokenWithJWT(): void {
+		$this->client->method('getOpenIdConfig')->willReturn(['use-token-introspection-endpoint' => false]);
+		$this->client->method('verifyJWTsignature')->willReturn(true);
+		$this->client->method('getAccessTokenPayload')->willReturn((object)['exp' => \time() + 3600]);
+		$this->client->method('requestUserInfo')->willReturn((object)['email' => 'foo@example.com']);
+		$this->cacheFactory->method('create')->willReturn(new ArrayCache());
+		$user = $this->createMock(IUser::class);
+		$this->lookupService->expects(self::once())->method('lookupUser')->willReturn($user);
+		$request = $this->createMock(IRequest::class);
+		$request->method('getHeader')->willReturn('Bearer 1234567890');
+
+		$return = $this->authModule->auth($request);
+		self::assertEquals($user, $return);
+	}
+
 	public function testExpiredCachedToken(): void {
 		$this->expectException(LoginException::class);
 		$this->expectExceptionMessage('OpenID Connect token expired');
