@@ -121,7 +121,12 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		}
 	}
 
-	public function getUserPassword(IRequest $request) {
+	/**
+	 * @param IRequest $request
+	 * @return String
+	 * @codeCoverageIgnore
+	 */
+	public function getUserPassword(IRequest $request): string {
 		return '';
 	}
 

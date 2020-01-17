@@ -83,7 +83,9 @@ class ClientTest extends TestCase {
 					'provider-url' => $providerUrl,
 					'client-id' => 'client-id',
 					'client-secret' => 'secret',
-					'scopes' => ['openid', 'profile']
+					'scopes' => ['openid', 'profile'],
+					'provider-params' => ['bar'],
+					'auth-params' => ['foo']
 				];
 			}
 			if ($key === 'debug') {
