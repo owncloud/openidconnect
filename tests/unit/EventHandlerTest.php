@@ -66,7 +66,7 @@ class EventHandlerTest extends TestCase {
 
 		$this->eventHandler = $this->getMockBuilder(EventHandler::class)
 			->setConstructorArgs([$this->dispatcher, $this->request, $this->userSession, $this->session])
-			->setMethods(['createPlugin'])
+			->setMethods(['createAuthBackend'])
 			->getMock();
 	}
 
@@ -80,7 +80,7 @@ class EventHandlerTest extends TestCase {
 		$this->dispatcher->method('addListener')->willReturnCallback(static function ($name, $callback) use ($event) {
 			$callback($event);
 		});
-		$this->eventHandler->expects(self::never())->method('createPlugin');
+		$this->eventHandler->expects(self::never())->method('createAuthBackend');
 		$this->eventHandler->registerEventHandler();
 	}
 
@@ -90,7 +90,7 @@ class EventHandlerTest extends TestCase {
 		$this->dispatcher->method('addListener')->willReturnCallback(static function ($name, $callback) use ($event) {
 			$callback($event);
 		});
-		$this->eventHandler->expects(self::never())->method('createPlugin');
+		$this->eventHandler->expects(self::never())->method('createAuthBackend');
 		$this->eventHandler->registerEventHandler();
 	}
 
@@ -103,7 +103,7 @@ class EventHandlerTest extends TestCase {
 		$this->dispatcher->method('addListener')->willReturnCallback(static function ($name, $callback) use ($event) {
 			$callback($event);
 		});
-		$this->eventHandler->expects(self::once())->method('createPlugin');
+		$this->eventHandler->expects(self::once())->method('createAuthBackend');
 		$this->eventHandler->registerEventHandler();
 	}
 }
