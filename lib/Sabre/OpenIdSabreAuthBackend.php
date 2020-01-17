@@ -29,7 +29,7 @@ use OCP\ISession;
 use OCP\IUserSession;
 use Sabre\DAV\Auth\Backend\AbstractBearer;
 
-class OpenIdSabreAuthPlugin extends AbstractBearer {
+class OpenIdSabreAuthBackend extends AbstractBearer {
 	const DAV_AUTHENTICATED = Auth::DAV_AUTHENTICATED;
 
 	/**
@@ -119,17 +119,18 @@ class OpenIdSabreAuthPlugin extends AbstractBearer {
 
 			// setup the user
 			$userId = $this->userSession->getUser()->getUID();
-			\OC_Util::setupFS($userId);
+			$this->setupFilesystem($userId);
 			$this->session->close();
 			return $this->principalPrefix . $userId;
 		}
 
-		\OC_Util::setupFS(); //login hooks may need early access to the filesystem
+		$this->setupFilesystem();
 
 		try {
+			// we have to go through IUserSession here to login the user properly
 			if ($this->userSession->tryAuthModuleLogin($this->request)) {
 				$userId = $this->userSession->getUser()->getUID();
-				\OC_Util::setupFS($userId);
+				$this->setupFilesystem($userId);
 				$this->session->set(self::DAV_AUTHENTICATED, $userId);
 				$this->session->close();
 				return $this->principalPrefix . $userId;
@@ -141,5 +142,13 @@ class OpenIdSabreAuthPlugin extends AbstractBearer {
 			$this->session->close();
 			return false;
 		}
+	}
+
+	/**
+	 * @param string $userId
+	 * @codeCoverageIgnore
+	 */
+	protected function setupFilesystem(string $userId = ''): void {
+		\OC_Util::setupFS($userId);
 	}
 }

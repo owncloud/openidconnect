@@ -21,7 +21,7 @@
  */
 namespace OCA\OpenIdConnect;
 
-use OCA\OpenIdConnect\Sabre\OpenIdSabreAuthPlugin;
+use OCA\OpenIdConnect\Sabre\OpenIdSabreAuthBackend;
 use OCP\IRequest;
 use OCP\ISession;
 use OCP\IUserSession;
@@ -60,19 +60,19 @@ class EventHandler {
 			}
 			$authPlugin = $event->getServer()->getPlugin('auth');
 			if ($authPlugin instanceof Plugin) {
-				$authPlugin->addBackend($this->createPlugin());
+				$authPlugin->addBackend($this->createAuthBackend());
 			}
 		});
 	}
 
 	/**
-	 * @return OpenIdSabreAuthPlugin
+	 * @return OpenIdSabreAuthBackend
 	 * @throws \OCP\AppFramework\QueryException
 	 * @codeCoverageIgnore
 	 */
-	protected function createPlugin(): OpenIdSabreAuthPlugin {
+	protected function createAuthBackend(): OpenIdSabreAuthBackend {
 		$module = \OC::$server->query(OpenIdConnectAuthModule::class);
-		return new OpenIdSabreAuthPlugin($this->session,
+		return new OpenIdSabreAuthBackend($this->session,
 			$this->userSession,
 			$this->request,
 			$module,
