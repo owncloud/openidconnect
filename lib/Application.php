@@ -32,6 +32,12 @@ class Application extends App {
 	/** @var Logger */
 	private $logger;
 
+	/**
+	 * Application constructor.
+	 *
+	 * @param array $urlParams
+	 * @codeCoverageIgnore
+	 */
 	public function __construct(array $urlParams = []) {
 		parent::__construct('openidconnect', $urlParams);
 	}
