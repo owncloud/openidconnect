@@ -6,7 +6,7 @@
     <description>OpenID Connect Integration with ownCloud</description>
     <licence>GPLv2</licence>
     <author>Thomas Müller</author>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <namespace>OpenIdConnect</namespace>
     <category>security</category>
     <website>https://github.com/owncloud/openidconnect</website>
