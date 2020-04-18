@@ -1,10 +1,10 @@
 {
     "_readme": [
         "This file locks the dependencies of your project to a known state",
-        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
+        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
-    "content-hash": "3d134e8757648f675a591ee78c6c906a",
+    "content-hash": "752b5bd02618c123de19d841ac11c1ed",
     "packages": [
         {
             "name": "jumbojett/openid-connect-php",
