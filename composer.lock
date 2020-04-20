@@ -1,23 +1,24 @@
 {
     "_readme": [
         "This file locks the dependencies of your project to a known state",
-        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
+        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "752b5bd02618c123de19d841ac11c1ed",
+    "content-hash": "578907f243ddf227a4a9a44f373950de",
     "packages": [
         {
             "name": "jumbojett/openid-connect-php",
-            "version": "dev-master",
+            "version": "v0.9.0",
             "source": {
                 "type": "git",
-                "url": "https://github.com/DeepDiver1975/OpenID-Connect-PHP.git",
-                "reference": "540c88c6ea676b5bf8dd3a1d79972f3728d5bed6"
+                "url": "https://github.com/jumbojett/OpenID-Connect-PHP.git",
+                "reference": "87eefea40abd9cea0290aa9b6cdb314fd0037fe2"
             },
-            "archive": {
-                "exclude": [
-                    ".*"
-                ]
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/jumbojett/OpenID-Connect-PHP/zipball/87eefea40abd9cea0290aa9b6cdb314fd0037fe2",
+                "reference": "87eefea40abd9cea0290aa9b6cdb314fd0037fe2",
+                "shasum": ""
             },
             "require": {
                 "ext-curl": "*",
@@ -35,11 +36,12 @@
                     "src/"
                 ]
             },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "Apache-2.0"
             ],
             "description": "Bare-bones OpenID Connect client",
-            "time": "2020-01-07T12:49:57+00:00"
+            "time": "2020-03-09T13:26:39+00:00"
         },
         {
             "name": "phpseclib/phpseclib",
@@ -184,9 +186,7 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {
-        "jumbojett/openid-connect-php": 20
-    },
+    "stability-flags": [],
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
@@ -195,5 +195,6 @@
     "platform-dev": [],
     "platform-overrides": {
         "php": "7.0.8"
-    }
+    },
+    "plugin-api-version": "1.1.0"
 }
