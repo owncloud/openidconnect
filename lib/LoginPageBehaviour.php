@@ -62,6 +62,7 @@ class LoginPageBehaviour {
 			return;
 		}
 		$components = \parse_url($this->request->getRequestUri());
+		/** @phan-suppress-next-line PhanTypePossiblyInvalidDimOffset */
 		$uri = $components['path'];
 		if (\substr($uri, -6) === '/login') {
 			$req = $this->request->getRequestUri();
