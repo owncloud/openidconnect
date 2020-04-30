@@ -4,4 +4,4 @@ vendor-bin/**/composer.lock
 /vendor/
 /build/
 /tests/output/
-
+.phpunit.result.cache

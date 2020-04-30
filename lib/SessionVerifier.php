@@ -96,9 +96,10 @@ class SessionVerifier {
 		}
 
 		$client->setAccessToken($accessToken);
-		if ($client->getOpenIdConfig()['use-token-introspection-endpoint']) {
-			$introspectionClientId = $client->getOpenIdConfig()['token-introspection-endpoint-client-id'] ?? null;
-			$introspectionClientSecret = $client->getOpenIdConfig()['token-introspection-endpoint-client-secret'] ?? null;
+		$openIdConfig = $client->getOpenIdConfig();
+		if (isset($openIdConfig['use-token-introspection-endpoint'])) {
+			$introspectionClientId = $openIdConfig['token-introspection-endpoint-client-id'] ?? null;
+			$introspectionClientSecret = $openIdConfig['token-introspection-endpoint-client-secret'] ?? null;
 
 			$introData = $client->introspectToken($accessToken, '', $introspectionClientId, $introspectionClientSecret);
 			$this->logger->debug('Introspection info: ' . \json_encode($introData) . ' for access token:' . $accessToken);
