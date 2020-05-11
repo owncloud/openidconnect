@@ -44,11 +44,13 @@ class Logger implements ILogger {
 	 *
 	 * @param string $message
 	 * @param array $context
+	 * @return null
 	 * @since 7.0.0
 	 */
 	public function emergency($message, array $context = []) {
 		$context['app'] = 'OpenID';
 		$this->logger->emergency($message, $context);
+		return null;
 	}
 
 	/**
@@ -56,11 +58,13 @@ class Logger implements ILogger {
 	 *
 	 * @param string $message
 	 * @param array $context
+	 * @return null
 	 * @since 7.0.0
 	 */
 	public function alert($message, array $context = []) {
 		$context['app'] = 'OpenID';
 		$this->logger->alert($message, $context);
+		return null;
 	}
 
 	/**
@@ -68,11 +72,13 @@ class Logger implements ILogger {
 	 *
 	 * @param string $message
 	 * @param array $context
+	 * @return null
 	 * @since 7.0.0
 	 */
 	public function critical($message, array $context = []) {
 		$context['app'] = 'OpenID';
 		$this->logger->critical($message, $context);
+		return null;
 	}
 
 	/**
@@ -81,11 +87,13 @@ class Logger implements ILogger {
 	 *
 	 * @param string $message
 	 * @param array $context
+	 * @return null
 	 * @since 7.0.0
 	 */
 	public function error($message, array $context = []) {
 		$context['app'] = 'OpenID';
 		$this->logger->error($message, $context);
+		return null;
 	}
 
 	/**
@@ -93,11 +101,13 @@ class Logger implements ILogger {
 	 *
 	 * @param string $message
 	 * @param array $context
+	 * @return null
 	 * @since 7.0.0
 	 */
 	public function warning($message, array $context = []) {
 		$context['app'] = 'OpenID';
 		$this->logger->warning($message, $context);
+		return null;
 	}
 
 	/**
@@ -105,11 +115,13 @@ class Logger implements ILogger {
 	 *
 	 * @param string $message
 	 * @param array $context
+	 * @return null
 	 * @since 7.0.0
 	 */
 	public function notice($message, array $context = []) {
 		$context['app'] = 'OpenID';
 		$this->logger->notice($message, $context);
+		return null;
 	}
 
 	/**
@@ -117,11 +129,13 @@ class Logger implements ILogger {
 	 *
 	 * @param string $message
 	 * @param array $context
+	 * @return null
 	 * @since 7.0.0
 	 */
 	public function info($message, array $context = []) {
 		$context['app'] = 'OpenID';
 		$this->logger->info($message, $context);
+		return null;
 	}
 
 	/**
@@ -129,11 +143,13 @@ class Logger implements ILogger {
 	 *
 	 * @param string $message
 	 * @param array $context
+	 * @return null
 	 * @since 7.0.0
 	 */
 	public function debug($message, array $context = []) {
 		$context['app'] = 'OpenID';
 		$this->logger->debug($message, $context);
+		return null;
 	}
 
 	/**
