@@ -115,7 +115,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 				return $user;
 			}
 			return null;
-		} catch (OpenIDConnectClientException $ex) {
+		} catch (OpenIDConnectClientException | LoginException $ex) {
 			$this->logger->logException($ex);
 			return null;
 		}
