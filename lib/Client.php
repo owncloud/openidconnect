@@ -66,7 +66,8 @@ class Client extends OpenIDConnectClient {
 		$scopes = $openIdConfig['scopes'] ?? ['openid', 'profile', 'email'];
 		$this->addScope($scopes);
 
-		if ($this->config->getSystemValue('debug', false)) {
+		$insecure = $openIdConfig['insecure'] ?? false;
+		if ($insecure) {
 			$this->setVerifyHost(false);
 			$this->setVerifyPeer(false);
 		}

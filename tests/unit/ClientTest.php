@@ -75,9 +75,8 @@ class ClientTest extends TestCase {
 
 	public function testCtor(): void {
 		$providerUrl = 'https://example.net';
-		$debug = true;
 
-		$this->config->method('getSystemValue')->willReturnCallback(static function ($key) use ($debug, $providerUrl) {
+		$this->config->method('getSystemValue')->willReturnCallback(static function ($key) use ($providerUrl) {
 			if ($key === 'openid-connect') {
 				return [
 					'provider-url' => $providerUrl,
@@ -85,11 +84,35 @@ class ClientTest extends TestCase {
 					'client-secret' => 'secret',
 					'scopes' => ['openid', 'profile'],
 					'provider-params' => ['bar'],
-					'auth-params' => ['foo']
+					'auth-params' => ['foo'],
 				];
 			}
-			if ($key === 'debug') {
-				return $debug;
+			throw new \InvalidArgumentException("Unexpected key: $key");
+		});
+		$this->client = $this->getMockBuilder(Client::class)
+			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session])
+			->setMethods(['fetchURL'])
+			->getMock();
+
+		self::assertEquals($providerUrl, $this->client->getProviderURL());
+		self::assertEquals(true, $this->client->getVerifyHost());
+		self::assertEquals(true, $this->client->getVerifyPeer());
+	}
+
+	public function testCtorInsecure(): void {
+		$providerUrl = 'https://example.net';
+
+		$this->config->method('getSystemValue')->willReturnCallback(static function ($key) use ($providerUrl) {
+			if ($key === 'openid-connect') {
+				return [
+					'provider-url' => $providerUrl,
+					'client-id' => 'client-id',
+					'client-secret' => 'secret',
+					'scopes' => ['openid', 'profile'],
+					'provider-params' => ['bar'],
+					'auth-params' => ['foo'],
+					'insecure' => true
+				];
 			}
 			throw new \InvalidArgumentException("Unexpected key: $key");
 		});
