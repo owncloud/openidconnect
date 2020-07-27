@@ -8,9 +8,9 @@ For development purpose APCu is reasonable as well.
 Please follow the [documentation on how to set up caching](https://doc.owncloud.org/server/admin_manual/configuration/server/caching_configuration.html#supported-caching-backends).
 
 ### Setup config.php
-The OpenId integration is established by entering the parameters below to the 
+The OpenId integration is established by entering the parameters below to the
 ownCloud configuration file.
-_provider-url_, _client-id_ and _client-secret- are to be taken from the OpenId 
+_provider-url_, _client-id_ and _client-secret- are to be taken from the OpenId
 Provider setup.
 _loginButtonName_ can be chosen freely depending on the installation.
 
@@ -55,12 +55,12 @@ $CONFIG = [
 ### Setup within the OpenId Provider
 When registering ownCloud as OpenId Client use ```https://cloud.example.net/index.php/apps/openidconnect/redirect``` as redirect url .
 
-In case [OpenID Connect Front-Channel Logout 1.0](https://openid.net/specs/openid-connect-frontchannel-1_0.html) 
+In case [OpenID Connect Front-Channel Logout 1.0](https://openid.net/specs/openid-connect-frontchannel-1_0.html)
 is supported please enter ```https://cloud.example.net/index.php/apps/openidconnect/logout``` as logout url within the client registration of the OpenId Provider.
 We require ```frontchannel_logout_session_required``` to be true.
 
 ### Setup service discovery
-In order to allow other clients to use OpenID Connect when talking to ownCloud please setup 
+In order to allow other clients to use OpenID Connect when talking to ownCloud please setup
 a redirect on the web server to point .well-known/openid-configuration to /index.php/apps/openidconnect/config
 
 This is an .htaccess example
@@ -104,14 +104,16 @@ To set it up locally do the following:
           'loginButtonName' => 'node-oidc-provider',
           'mode' => 'userid',
           'search-attribute' => 'sub',
-          'use-token-introspection-endpoint' => true
+          'use-token-introspection-endpoint' => true,
+          // do not verify tls host or peer
+          'insecure' => true
       ],
     ];
-    
+
     ```
 8. Clients can now use http://localhost:3000/.well-known/openid-configuration to obtain all information which is necessary
 to initiate the OpenId Connect flow. Use the granted access token in any request to ownCloud within a bearer authentication header.
-9. You can login with any credentials but you need to make sure that the user with the given user id exists. In a real world deployment the users will come from LDAP.  
+9. You can login with any credentials but you need to make sure that the user with the given user id exists. In a real world deployment the users will come from LDAP.
 Keep in mind that by default, oidc app will search for the `email` attribute - which is hardcoded to `johndoe@example.com` [ref](https://github.com/panva/node-oidc-provider/blob/master/example/support/account.js#L32)
 If you wish to map the login name on the oidc-provider with owncloud user ids, you can configure it as following:
 ```
