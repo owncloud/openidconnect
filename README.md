@@ -37,6 +37,7 @@ $CONFIG = [
     'client-id' => 'fc9b5c78-ec73-47bf-befc-59d4fe780f6f',
     'client-secret' => 'e3e5b04a-3c3c-4f4d-b16c-2a6e9fdd3cd1',
     'loginButtonName' => 'OpenId Connect',
+    'post_logout_redirect_uri' => '...',
     'provider-params' => [
       'authorization_endpoint' => '...',
       'token_endpoint' => '...',

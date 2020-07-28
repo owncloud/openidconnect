@@ -22,23 +22,15 @@
 
 namespace OCA\OpenIdConnect\Tests\Unit;
 
-use http\Exception;
 use OC\HintException;
 use OCA\OpenIdConnect\Client;
-use OCA\OpenIdConnect\EventHandler;
 use OCA\OpenIdConnect\Logger;
 use OCA\OpenIdConnect\SessionVerifier;
 use OCP\ICache;
 use OCP\ICacheFactory;
-use OCP\IRequest;
 use OCP\ISession;
-use OCP\IUser;
 use OCP\IUserSession;
-use OCP\SabrePluginEvent;
 use PHPUnit\Framework\MockObject\MockObject;
-use Sabre\DAV\Auth\Plugin;
-use Sabre\DAV\Server;
-use Symfony\Component\EventDispatcher\Event;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Test\TestCase;
 
@@ -208,5 +200,28 @@ class SessionVerifierTest extends TestCase {
 		$this->client->expects(self::once())->method('setAccessToken')->with('access-123456');
 
 		$this->sessionVerifier->verifySession();
+	}
+
+	public function provideOpenIdConfig() {
+		return [
+			[null, null],
+			[[], null],
+			[['post_logout_redirect_uri' => null], null],
+			[['post_logout_redirect_uri' => 'http://localhost'], 'http://localhost'],
+		];
+	}
+
+	/**
+	 * @dataProvider provideOpenIdConfig
+	 * @param string[]|null $openIdConfig
+	 * @param string $expectedLogoutRedirectUri
+	 */
+	public function testLogoutRedirect($openIdConfig, $expectedLogoutRedirectUri) {
+		$this->client->method('getOpenIdConfig')
+			->willReturn($openIdConfig);
+		$this->client->expects($this->once())
+			->method('signOut')
+			->with($this->anything(), $expectedLogoutRedirectUri);
+		$this->sessionVerifier->afterLogout('dummy', 'dummy');
 	}
 }
