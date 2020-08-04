@@ -21,6 +21,26 @@ PHPSTAN=php -d zend.enable_gc=0 vendor-bin/phpstan/vendor/bin/phpstan
 
 KARMA=$(NODE_PREFIX)/node_modules/.bin/karma
 
+app_name=openidconnect
+build_dir=$(CURDIR)/build
+dist_dir=$(build_dir)/dist
+src_files=README.md LICENSE
+src_dirs=appinfo img lib vendor
+all_src=$(src_dirs) $(src_files)
+
+occ=$(CURDIR)/../../occ
+private_key=$(HOME)/.owncloud/certificates/$(app_name).key
+certificate=$(HOME)/.owncloud/certificates/$(app_name).crt
+sign=$(occ) integrity:sign-app --privateKey="$(private_key)" --certificate="$(certificate)"
+sign_skip_msg="Skipping signing, either no key and certificate found in $(private_key) and $(certificate) or occ can not be found at $(occ)"
+ifneq (,$(wildcard $(private_key)))
+ifneq (,$(wildcard $(certificate)))
+ifneq (,$(wildcard $(occ)))
+	CAN_SIGN=true
+endif
+endif
+endif
+
 .DEFAULT_GOAL := all
 
 help:
@@ -52,6 +72,32 @@ dev: ## Initialize dev environment
 dev: install-deps
 
 $(KARMA): $(nodejs_deps)
+
+.PHONY: dist
+dist: ## Build distribution
+dist: composer distdir sign package
+
+.PHONY: composer
+composer:
+	$(COMPOSER_BIN) install --no-dev
+
+.PHONY: distdir
+distdir:
+	rm -rf $(dist_dir)
+	mkdir -p $(dist_dir)/$(app_name)
+	cp -R $(all_src) $(dist_dir)/$(app_name)
+
+.PHONY: sign
+sign:
+ifdef CAN_SIGN
+	$(sign) --path="$(dist_dir)/$(app_name)"
+else
+	@echo $(sign_skip_msg)
+endif
+
+.PHONY: package
+package:
+	tar -czf $(dist_dir)/$(app_name).tar.gz -C $(dist_dir) $(app_name)
 
 ##
 ## Tests

@@ -21,7 +21,7 @@ config = {
 
 	'build': {
 		'commands': [
-			'make -f Makefile.release dist',
+			'make dist',
 		],
 	},
 
