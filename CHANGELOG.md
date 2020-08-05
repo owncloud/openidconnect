@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [1.0.0] - 2020-07-22
 
+### Added
+
+- Add configurable post_logout_redirect_uri - [#90](https://github.com/owncloud/openidconnect/issues/90)
+
 ### Changed
 
 - Bump libraries
