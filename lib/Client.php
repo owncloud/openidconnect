@@ -102,6 +102,39 @@ class Client extends OpenIDConnectClient {
 	/**
 	 * @codeCoverageIgnore
 	 */
+	protected function startSession() {
+	}
+
+	/**
+	 * @codeCoverageIgnore
+	 */
+	protected function setSessionKey($key, $value) {
+		$this->session->set($key, $value);
+	}
+
+	/**
+	 * @codeCoverageIgnore
+	 */
+	protected function getSessionKey($key) {
+		return $this->session->get($key);
+	}
+
+	/**
+	 * @codeCoverageIgnore
+	 */
+	protected function unsetSessionKey($key) {
+		$this->session->remove($key);
+	}
+
+	/**
+	 * @codeCoverageIgnore
+	 */
+	protected function commitSession() {
+	}
+
+	/**
+	 * @codeCoverageIgnore
+	 */
 	protected function fetchURL($url, $post_body = null, $headers = []) {
 		// TODO: see how to use ownCloud HttpClient ....
 		return parent::fetchURL($url, $post_body, $headers);
