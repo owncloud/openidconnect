@@ -97,7 +97,7 @@ class SessionVerifier {
 
 		$client->setAccessToken($accessToken);
 		$openIdConfig = $client->getOpenIdConfig();
-		if (isset($openIdConfig['use-token-introspection-endpoint'])) {
+		if (isset($openIdConfig['use-token-introspection-endpoint']) && $openIdConfig['use-token-introspection-endpoint']) {
 			$introspectionClientId = $openIdConfig['token-introspection-endpoint-client-id'] ?? null;
 			$introspectionClientSecret = $openIdConfig['token-introspection-endpoint-client-secret'] ?? null;
 
