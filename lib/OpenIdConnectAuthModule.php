@@ -185,7 +185,12 @@ class OpenIdConnectAuthModule implements IAuthModule {
 
 		$this->client->setAccessToken($bearerToken);
 
-		$userInfo = $this->client->requestUserInfo();
+		if ($this->client->getIdToken()) {
+			$userInfo = $this->client->getIdTokenPayload();
+		} else {
+			$userInfo = $this->client->requestUserInfo();
+		}
+
 		$this->logger->debug('User info: ' . \json_encode($userInfo));
 		if ($userInfo === null) {
 			return null;

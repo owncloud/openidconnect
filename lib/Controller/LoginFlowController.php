@@ -128,7 +128,12 @@ class LoginFlowController extends Controller {
 		}
 		$this->logger->debug('Access token: ' . $openid->getAccessToken());
 		$this->logger->debug('Refresh token: ' . $openid->getRefreshToken());
-		$userInfo = $openid->requestUserInfo();
+		$this->logger->debug('Id token: ' . $openid->getIdToken());
+		if ($openid->getIdToken()) {
+			$userInfo = $openid->getIdTokenPayload();
+		} else {
+			$userInfo = $openid->requestUserInfo();
+		}
 		$this->logger->debug('User info: ' . \json_encode($userInfo));
 		if (!$userInfo) {
 			throw new LoginException('No user information available.');

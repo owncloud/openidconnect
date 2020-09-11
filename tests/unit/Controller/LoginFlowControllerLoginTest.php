@@ -139,6 +139,27 @@ class LoginFlowControllerLoginTest extends TestCase {
 	public function testLoginCreateSuccess(): void {
 		$this->client->method('getOpenIdConfig')->willReturn([]);
 		$this->client->method('requestUserInfo')->willReturn((object)['email' => 'foo@exmaple.net']);
+		$this->client->method('getAccessToken')->willReturn('access');
+		$this->client->method('getRefreshToken')->willReturn('refresh');
+		$user = $this->createMock(IUser::class);
+		$this->userLookup->method('lookupUser')->willReturn($user);
+		$this->userSession->method('createSessionToken')->willReturn(true);
+		$this->userSession->method('loginUser')->willReturn(true);
+		$this->session->expects(self::exactly(3))->method('set')->withConsecutive(
+			['oca.openid-connect.id-token', null],
+			['oca.openid-connect.access-token', 'access'],
+			['oca.openid-connect.refresh-token', 'refresh']
+		);
+
+		$response = $this->controller->login();
+
+		self::assertInstanceOf(RedirectResponse::class, $response);
+	}
+
+	public function testLoginCreateSuccessWithIdToken(): void {
+		$this->client->method('getOpenIdConfig')->willReturn([]);
+		$this->client->expects(self::never())->method('requestUserInfo');
+		$this->client->method('getIdTokenPayload')->willReturn((object)['email' => 'foo@exmaple.net']);
 		$this->client->method('getIdToken')->willReturn('id');
 		$this->client->method('getAccessToken')->willReturn('access');
 		$this->client->method('getRefreshToken')->willReturn('refresh');
