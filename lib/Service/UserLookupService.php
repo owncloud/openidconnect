@@ -69,12 +69,26 @@ class UserLookupService {
 			if (\count($user) !== 1) {
 				throw new LoginException("{$userInfo->$attribute} is not unique.");
 			}
+			$this->validUser($user[0]);
 			return $user[0];
 		}
 		$user = $this->userManager->get($userInfo->$attribute);
 		if (!$user) {
 			throw new LoginException("User {$userInfo->$attribute} is not known.");
 		}
+		$this->validUser($user);
 		return $user;
+	}
+
+	private function validUser(IUser $user): void {
+		$openIdConfig = $this->client->getOpenIdConfig();
+		$allowedUserBackEnds = $openIdConfig['allowed-user-backends'] ?? null;
+		if ($allowedUserBackEnds === null) {
+			return;
+		}
+		if (\in_array($user->getBackendClassName(), $allowedUserBackEnds, true)) {
+			return;
+		}
+		throw new LoginException("User is from wrong user backend <{$user->getBackendClassName()}>");
 	}
 }

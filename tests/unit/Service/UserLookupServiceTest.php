@@ -98,4 +98,23 @@ class UserLookupServiceTest extends TestCase {
 		$return = $this->userLookup->lookupUser((object)['preferred_username' => 'alice']);
 		self::assertEquals($user, $return);
 	}
+
+	public function testInvalidUserBackEnd(): void {
+		$this->client->method('getOpenIdConfig')->willReturn(['mode' => 'userid', 'search-attribute' => 'preferred_username', 'allowed-user-backends' => ['LDAP']]);
+		$user = $this->createMock(IUser::class);
+		$user->method('getBackendClassName')->willReturn('Database');
+		$this->manager->method('get')->willReturn($user);
+
+		$this->expectException(LoginException::class);
+		$this->userLookup->lookupUser((object)['preferred_username' => 'alice']);
+	}
+
+	public function testValidUserBackEnd(): void {
+		$this->client->method('getOpenIdConfig')->willReturn(['mode' => 'userid', 'search-attribute' => 'preferred_username', 'allowed-user-backends' => ['LDAP']]);
+		$user = $this->createMock(IUser::class);
+		$user->method('getBackendClassName')->willReturn('LDAP');
+		$this->manager->method('get')->willReturn($user);
+		$return = $this->userLookup->lookupUser((object)['preferred_username' => 'alice']);
+		self::assertEquals($user, $return);
+	}
 }
