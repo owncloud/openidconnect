@@ -119,6 +119,19 @@ class LoginFlowController extends Controller {
 		if (!$openid) {
 			throw new HintException('Configuration issue in openidconnect app');
 		}
+		$redirectUrl = \urldecode($this->request->getParam('redirect_url'));
+
+		if (	// Keep oauth authorization requests after login
+			(\strpos($redirectUrl, '/oauth2/authorize') !== false)
+				// But deny the redirect if the URL contains a @
+				// This prevents unvalidated redirects like ?redirect_url=:user@domain.com
+			&& (\strpos($redirectUrl, '@') === false)
+		) {
+			$urlGenerator = \OC::$server->getURLGenerator();
+			$location = $urlGenerator->getAbsoluteURL($redirectUrl);
+			$this->session->set('oca.openid-connect.redirect-url', $location);
+		}
+
 		try {
 			$this->logger->debug('Before openid->authenticate');
 			$openid->authenticate();
@@ -126,6 +139,7 @@ class LoginFlowController extends Controller {
 			$this->logger->logException($ex);
 			throw new HintException('Error in OpenIdConnect:' . $ex->getMessage());
 		}
+
 		$this->logger->debug('Access token: ' . $openid->getAccessToken());
 		$this->logger->debug('Refresh token: ' . $openid->getRefreshToken());
 		$userInfo = $openid->requestUserInfo();
@@ -153,7 +167,12 @@ class LoginFlowController extends Controller {
 			} else {
 				$this->logger->debug('Id token holds no sid: ' . \json_encode($openid->getIdTokenPayload()));
 			}
-			return new RedirectResponse($this->getDefaultUrl());
+			$redirectUrl = $this->session->get('oca.openid-connect.redirect-url');
+			$this->session->remove('oca.openid-connect.redirect-url');
+			if ($redirectUrl === null) {
+				$redirectUrl = $this->getDefaultUrl();
+			}
+			return new RedirectResponse($redirectUrl);
 		}
 		$this->logger->error("Unable to login {$user->getUID()}");
 		return new RedirectResponse('/');

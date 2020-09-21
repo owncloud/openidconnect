@@ -86,9 +86,14 @@ class LoginPageBehaviour {
 	 * @codeCoverageIgnore
 	 */
 	public function registerAlternativeLogin(string $loginName): void {
+		$buttonHref = $this->urlGenerator->linkToRoute('openidconnect.loginFlow.login');
+		$redirectUrl = $this->request->getParam('redirect_url');
+		if ($redirectUrl !== null) {
+			$buttonHref .= '?redirect_url=' . $redirectUrl;
+		}
 		OC_App::registerLogIn([
 			'name' => $loginName,
-			'href' => $this->urlGenerator->linkToRoute('openidconnect.loginFlow.login'),
+			'href' => $buttonHref,
 		]);
 	}
 }
