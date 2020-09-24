@@ -60,6 +60,9 @@ class UserLookupService {
 			$searchByEmail = false;
 		}
 		$attribute = $openIdConfig['search-attribute'] ?? 'email';
+		if (!\property_exists($userInfo, $attribute)) {
+			throw new LoginException("Configured attribute $attribute is not known.");
+		}
 
 		if ($searchByEmail) {
 			$user = $this->userManager->getByEmail($userInfo->$attribute);

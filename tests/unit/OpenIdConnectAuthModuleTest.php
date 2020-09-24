@@ -126,7 +126,7 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 	public function testValidTokenWithIntrospection(): void {
 		$this->client->method('getOpenIdConfig')->willReturn(['use-token-introspection-endpoint' => true]);
 		$this->client->method('introspectToken')->willReturn((object)['active' => true, 'exp' => \time() + 3600]);
-		$this->client->method('requestUserInfo')->willReturn((object)['email' => 'foo@example.com']);
+		$this->client->method('getUserInfo')->willReturn((object)['email' => 'foo@example.com']);
 		$this->cacheFactory->method('create')->willReturn(new ArrayCache());
 		$user = $this->createMock(IUser::class);
 		$this->lookupService->expects(self::once())->method('lookupUser')->willReturn($user);
@@ -141,7 +141,7 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		$this->client->method('getOpenIdConfig')->willReturn(['use-token-introspection-endpoint' => false]);
 		$this->client->method('verifyJWTsignature')->willReturn(true);
 		$this->client->method('getAccessTokenPayload')->willReturn((object)['exp' => \time() + 3600]);
-		$this->client->method('requestUserInfo')->willReturn((object)['email' => 'foo@example.com']);
+		$this->client->method('getUserInfo')->willReturn((object)['email' => 'foo@example.com']);
 		$this->cacheFactory->method('create')->willReturn(new ArrayCache());
 		$user = $this->createMock(IUser::class);
 		$this->lookupService->expects(self::once())->method('lookupUser')->willReturn($user);

@@ -48,6 +48,13 @@ class ClientTest extends TestCase {
 	 */
 	private $config;
 
+	public function providesGetUserInfoData(): array {
+		return [
+			'access-token' => [true],
+			'user-info-endpoint' => [false],
+		];
+	}
+
 	protected function setUp(): void {
 		parent::setUp();
 		$this->config = $this->createMock(IConfig::class);
@@ -124,5 +131,44 @@ class ClientTest extends TestCase {
 		self::assertEquals($providerUrl, $this->client->getProviderURL());
 		self::assertEquals(false, $this->client->getVerifyHost());
 		self::assertEquals(false, $this->client->getVerifyPeer());
+	}
+
+	/**
+	 * @dataProvider providesGetUserInfoData
+	 * @param $useAccessTokenPayloadForUserInfo
+	 */
+	public function testGetUserInfo($useAccessTokenPayloadForUserInfo): void {
+		$this->config->method('getSystemValue')->willReturnCallback(static function ($key) use ($useAccessTokenPayloadForUserInfo) {
+			if ($key === 'openid-connect') {
+				return [
+					'provider-url' => '$providerUrl',
+					'client-id' => 'client-id',
+					'client-secret' => 'secret',
+					'use-access-token-payload-for-user-info' => $useAccessTokenPayloadForUserInfo
+				];
+			}
+			throw new \InvalidArgumentException("Unexpected key: $key");
+		});
+
+		$this->client = $this->getMockBuilder(Client::class)
+			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session])
+			->onlyMethods(['requestUserInfo', 'getAccessTokenPayload'])
+			->getMock();
+		if ($useAccessTokenPayloadForUserInfo) {
+			$this->client->expects(self::never())->method('requestUserInfo');
+			$this->client->expects(self::once())->method('getAccessTokenPayload')->willReturn([
+				'preferred_username' => 'alice@example.net'
+			]);
+		} else {
+			$this->client->expects(self::never())->method('getAccessTokenPayload');
+			$this->client->expects(self::once())->method('requestUserInfo')->willReturn([
+				'preferred_username' => 'alice@example.net'
+			]);
+		}
+
+		$info = $this->client->getUserInfo();
+		self::assertEquals([
+			'preferred_username' => 'alice@example.net'
+		], $info);
 	}
 }

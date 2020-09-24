@@ -126,9 +126,15 @@ class LoginFlowController extends Controller {
 			$this->logger->logException($ex);
 			throw new HintException('Error in OpenIdConnect:' . $ex->getMessage());
 		}
-		$this->logger->debug('Access token: ' . $openid->getAccessToken());
-		$this->logger->debug('Refresh token: ' . $openid->getRefreshToken());
-		$userInfo = $openid->requestUserInfo();
+		$debugInfo = \json_encode([
+			'access_token' => $openid->getAccessToken(),
+			'refresh_token' => $openid->getRefreshToken(),
+			'id_token' => $openid->getIdToken(),
+			'access_token_payload' => $openid->getAccessTokenPayload(),
+		], JSON_PRETTY_PRINT);
+		$this->logger->debug('LoginFlowController::login : Token info: ' . $debugInfo);
+
+		$userInfo = $openid->getUserInfo();
 		$this->logger->debug('User info: ' . \json_encode($userInfo));
 		if (!$userInfo) {
 			throw new LoginException('No user information available.');

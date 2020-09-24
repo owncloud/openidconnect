@@ -93,6 +93,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	 * @throws LoginException
 	 */
 	public function authToken(string $bearerToken): ?IUser {
+		$this->logger->debug('OpenIdConnectAuthModule::authToken ' . $bearerToken);
 		try {
 			if ($this->client->getOpenIdConfig() === null) {
 				return null;
@@ -104,6 +105,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 			if ($expiry) {
 				$expiring = $expiry - \time();
 				if ($expiring < 0) {
+					$this->logger->debug("OpenID Connect token expired at $expiry");
 					throw new LoginException('OpenID Connect token expired');
 				}
 			}
@@ -114,6 +116,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 				$this->updateCache($bearerToken, $user, $expiry);
 				return $user;
 			}
+			$this->logger->debug('OpenIdConnectAuthModule::authToken : no user retrieved from token ' . $bearerToken);
 			return null;
 		} catch (OpenIDConnectClientException $ex) {
 			$this->logger->logException($ex);
@@ -173,20 +176,22 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	 * @return ICache
 	 */
 	private function getCache(): ICache {
-		return $this->cacheFactory->create('oca.openid-connect');
+		// TODO: needs cleanup and consolidation with SessionVerifier usage of the cache
+		return $this->cacheFactory->create('oca.openid-connect.2');
 	}
 
 	private function getUserResource($bearerToken) {
 		$cache = $this->getCache();
 		$userInfo = $cache->get($bearerToken);
 		if ($userInfo) {
+			$this->logger->debug('OpenIdConnectAuthModule::getUserResource from cache: ' . \json_encode($userInfo));
 			return $this->manager->get($userInfo['uid']);
 		}
 
 		$this->client->setAccessToken($bearerToken);
 
-		$userInfo = $this->client->requestUserInfo();
-		$this->logger->debug('User info: ' . \json_encode($userInfo));
+		$userInfo = $this->client->getUserInfo();
+		$this->logger->debug('OpenIdConnectAuthModule::getUserResource from cache: ' . \json_encode($userInfo));
 		if ($userInfo === null) {
 			return null;
 		}
@@ -194,12 +199,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		return $this->lookupService->lookupUser($userInfo);
 	}
 
-	/**
-	 * @param string $bearerToken
-	 * @param IUser $user
-	 * @param int $expiry
-	 */
-	private function updateCache($bearerToken, IUser $user, $expiry): void {
+	private function updateCache(string $bearerToken, IUser $user, int $expiry): void {
 		$cache = $this->getCache();
 		$cache->set($bearerToken, [
 			'uid' => $user->getUID(),
