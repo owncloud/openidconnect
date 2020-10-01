@@ -117,7 +117,7 @@ class LoginFlowControllerLoginTest extends TestCase {
 
 	public function testLoginUnknownUser(): void {
 		$this->client->method('getOpenIdConfig')->willReturn([]);
-		$this->client->method('requestUserInfo')->willReturn((object)['email' => 'foo@exmaple.net']);
+		$this->client->method('getUserInfo')->willReturn((object)['email' => 'foo@exmaple.net']);
 		$this->userLookup->method('lookupUser')->willThrowException(new LoginException('User foo is not known.'));
 		$this->expectException(LoginException::class);
 		$this->expectExceptionMessage('User foo is not known.');
@@ -127,7 +127,7 @@ class LoginFlowControllerLoginTest extends TestCase {
 
 	public function testLoginCreateSessionFailed(): void {
 		$this->client->method('getOpenIdConfig')->willReturn([]);
-		$this->client->method('requestUserInfo')->willReturn((object)['email' => 'foo@exmaple.net']);
+		$this->client->method('getUserInfo')->willReturn((object)['email' => 'foo@exmaple.net']);
 		$user = $this->createMock(IUser::class);
 		$this->userLookup->method('lookupUser')->willReturn($user);
 		$this->userSession->method('createSessionToken')->willReturn(false);
@@ -138,7 +138,7 @@ class LoginFlowControllerLoginTest extends TestCase {
 
 	public function testLoginCreateSuccess(): void {
 		$this->client->method('getOpenIdConfig')->willReturn([]);
-		$this->client->method('requestUserInfo')->willReturn((object)['email' => 'foo@exmaple.net']);
+		$this->client->method('getUserInfo')->willReturn((object)['email' => 'foo@exmaple.net']);
 		$this->client->method('getIdToken')->willReturn('id');
 		$this->client->method('getAccessToken')->willReturn('access');
 		$this->client->method('getRefreshToken')->willReturn('refresh');
