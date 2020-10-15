@@ -110,18 +110,23 @@ class OpenIdSabreAuthBackend extends AbstractBearer {
 	protected function validateBearerToken($bearerToken) {
 		if ($this->userSession->isLoggedIn() &&
 			$this->isDavAuthenticated($this->userSession->getUser()->getUID())) {
+			try {
 
-			// verify the bearer token
-			$tokenUser = $this->authModule->authToken($bearerToken);
-			if ($tokenUser === null) {
+				// verify the bearer token
+				$tokenUser = $this->authModule->authToken($bearerToken);
+				if ($tokenUser === null) {
+					return false;
+				}
+
+				// setup the user
+				$userId = $this->userSession->getUser()->getUID();
+				$this->setupFilesystem($userId);
+				$this->session->close();
+				return $this->principalPrefix . $userId;
+			} catch (\Exception $ex) {
+				$this->session->close();
 				return false;
 			}
-
-			// setup the user
-			$userId = $this->userSession->getUser()->getUID();
-			$this->setupFilesystem($userId);
-			$this->session->close();
-			return $this->principalPrefix . $userId;
 		}
 
 		$this->setupFilesystem();

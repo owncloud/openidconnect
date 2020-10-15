@@ -23,6 +23,7 @@
 namespace OCA\OpenIdConnect\Tests\Unit\Sabre;
 
 use OC\HintException;
+use OC\User\LoginException;
 use OC\User\Session;
 use OCA\OpenIdConnect\OpenIdConnectAuthModule;
 use OCA\OpenIdConnect\Sabre\OpenIdSabreAuthBackend;
@@ -151,5 +152,18 @@ class OpenIdSabreAuthBackendTest extends TestCase {
 
 		$return = $this->backend->check($this->sabreRequest, $this->sabreResponse);
 		self::assertEquals([true, 'principals/users/alice'], $return);
+	}
+
+	public function testTokenExpiry(): void {
+		$this->userSession->method('isLoggedIn')->willReturn(true);
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('alice');
+		$this->userSession->method('getUser')->willReturn($user);
+		$this->session->method('get')->with(OpenIdSabreAuthBackend::DAV_AUTHENTICATED)->willReturn('alice');
+
+		$this->authModule->expects(self::once())->method('authToken')->with('1234567890')->willThrowException(new LoginException(':zzz:'));
+
+		$return = $this->backend->check($this->sabreRequest, $this->sabreResponse);
+		self::assertEquals([false, 'Bearer token was incorrect'], $return);
 	}
 }
