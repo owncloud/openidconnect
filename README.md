@@ -76,6 +76,7 @@ Please note that service discovery is not mandatory at the moment since no clien
 ### How to setup an IdP for development and test purpose
 
 There are various Open Source IdPs out there. The one with the most features implemented seems to be [panva/node-oidc-provider](https://github.com/panva/node-oidc-provider).
+CAUTION: node-oidc-provider does not accept the redirect URLs we need for owncloud clients. For release testing, use kopano konnectd instead.
 
 To set it up locally do the following:
 1. Clone panva/node-oidc-provider
