@@ -49,9 +49,27 @@ $CONFIG = [
     ]
   ]
 ];
-
-
 ```
+
+#### All Configuration Values explained
+
+- loginButtonName - the name as displayed on the login screen which is used to redirect to the IdP
+- autoRedirectOnLoginPage - if set to true the login page will redirect to the Idp right away
+- provider-url - the url where the IdP is living. In some cases (KeyCloak, Azure AD) this holds more than just a domain but also a path
+- client-id & client-secret - self-explanatory
+- scopes - depending on the IdP setup, needs the list of required scopes to be entered here
+- insecure - boolean value (true/false), no ssl verification will take place when talking to the IdP - DON'T use in production
+- provider-params - additional config depending on the IdP is to be entered here - usually only necessary if the IdP does not support service discovery
+- auth-params - additional parameters which are sent to the IdP during the auth requests
+- redirect-url - the full url under which the ownCloud OpenId Connect redirect url is reachable - only needed in special setups
+- use-token-introspection-endpoint - if set to true the token introspection endpoint is used to verify a given access token - only needed if the access token is not a JWT
+- token-introspection-endpoint-client-id & token-introspection-endpoint-client-secret - client id and secret to be used with the token introspection endpoint
+- post_logout_redirect_uri - a given url where the IdP should redirect to after logout
+- mode - the mode to search for user in ownCloud - either userid or email
+- search-attribute - the attribute which is taken from the access token JWT or user info endpoint to identify the user
+- allowed-user-backends - limit the users which are allowed to login to a specific user backend - e.g. LDAP
+- use-access-token-payload-for-user-info - if set to true any user information will be read from the access token. If set to false the userinfo endpoint is used (starting app version 1.1.0)
+
 
 ### Setup within the OpenId Provider
 When registering ownCloud as OpenId Client use ```https://cloud.example.net/index.php/apps/openidconnect/redirect``` as redirect url .
