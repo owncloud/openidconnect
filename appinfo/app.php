@@ -20,6 +20,10 @@
  *
  */
 
+use OCA\OpenIdConnect\Application;
+
 // @codeCoverageIgnoreStart
-$app = new \OCA\OpenIdConnect\Application();
-$app->boot();
+(static function () {
+	$app = new Application();
+	$app->boot();
+})();
