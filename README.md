@@ -71,8 +71,6 @@ This is an .htaccess example
 
 The Apache modules proxy and proxy_http need to be enabled. (Debian/Ubuntu: a2enmod proxy proxy_http)
 
-Please note that service discovery is not mandatory at the moment since no client is supporting this yet.
-
 ### How to setup an IdP for development and test purpose
 
 There are various Open Source IdPs out there. The one with the most features implemented seems to be [panva/node-oidc-provider](https://github.com/panva/node-oidc-provider).
