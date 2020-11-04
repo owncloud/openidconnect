@@ -37,11 +37,17 @@ class UserLookupService {
 	 * @var Client
 	 */
 	private $client;
+	/**
+	 * @var AutoProvisioningService
+	 */
+	private $autoProvisioningService;
 
 	public function __construct(IUserManager $userManager,
-								Client $client) {
+								Client $client,
+								AutoProvisioningService $autoProvisioningService) {
 		$this->userManager = $userManager;
 		$this->client = $client;
+		$this->autoProvisioningService = $autoProvisioningService;
 	}
 
 	/**
@@ -67,6 +73,10 @@ class UserLookupService {
 		if ($searchByEmail) {
 			$user = $this->userManager->getByEmail($userInfo->$attribute);
 			if (!$user) {
+				if ($this->autoProvisioningService->enabled()) {
+					return $this->autoProvisioningService->createUser($userInfo);
+				}
+
 				throw new LoginException("User with {$userInfo->$attribute} is not known.");
 			}
 			if (\count($user) !== 1) {
@@ -77,6 +87,9 @@ class UserLookupService {
 		}
 		$user = $this->userManager->get($userInfo->$attribute);
 		if (!$user) {
+			if ($this->autoProvisioningService->enabled()) {
+				return $this->autoProvisioningService->createUser($userInfo);
+			}
 			throw new LoginException("User {$userInfo->$attribute} is not known.");
 		}
 		$this->validUser($user);
