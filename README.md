@@ -53,7 +53,7 @@ $CONFIG = [
 ```
 
 You can optionally add ``'autoRedirectOnLoginPage' => true`` to redirect to the IDP-Login Page directly thus skipping the default owncloud login-page.
-Note that the default login-oage is required to allow guest-users to login.
+Note that the default login-page is required to allow guest-users to login.
 
 ### Setup within the OpenId Provider
 When registering ownCloud as OpenId Client use ```https://cloud.example.net/index.php/apps/openidconnect/redirect``` as redirect url .
