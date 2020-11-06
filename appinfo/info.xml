@@ -2,11 +2,11 @@
 <info>
     <id>openidconnect</id>
     <name>OpenID Connect</name>
-    <summary>User authentication and SSO with OpenID Connect (OIDC)</summary>
+    <summary>Authentication and SSO with OpenID Connect (OIDC)</summary>
     <description>
 This extension adds support for [OpenID Connect](https://openid.net/connect/) to ownCloud Server. 
 
-OpenID Connect has become the leading standard for single sign-on and identity provision on the Internet. With ownCloud it can be used for user authentication and client authorization against an external Identity Provider.
+OpenID Connect is an open standard for single sign-on and identity and access management. With ownCloud it can be used for user authentication and client authorization against an external Identity Provider.
 
 **Benefits of using ownCloud with OpenID Connect**
 
@@ -15,7 +15,7 @@ OpenID Connect has become the leading standard for single sign-on and identity p
 - Centralized client management within the Identity Provider
 - Enterprise-grade security through the use of authentication security features (e.g., multi-factor authentication) and policies (e.g., automatic token expiration on certain conditions) provided by Identity Providers
 
-The integration requires an Identity Provider which supports OpenID Connect (e.g., Keycloak, Kopano Konnect, Ping Federate, ADFS or others).
+The integration requires an Identity Provider that supports OpenID Connect (e.g., Keycloak, Kopano Konnect, Ping Federate, ADFS, Azure AD or others).
 More information on setup, configuration and migration can be found in the ownCloud Documentation.</description>
     <licence>GPLv2</licence>
     <author>Thomas Müller</author>
