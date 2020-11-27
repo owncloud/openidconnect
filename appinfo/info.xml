@@ -4,7 +4,7 @@
     <name>OpenID Connect</name>
     <summary>Authentication and SSO with OpenID Connect (OIDC)</summary>
     <description>
-This extension adds support for [OpenID Connect](https://openid.net/connect/) to ownCloud Server. 
+This extension adds support for [OpenID Connect](https://openid.net/connect/) to ownCloud Server.
 
 OpenID Connect is an open standard for single sign-on and identity and access management. With ownCloud it can be used for user authentication and client authorization against an external Identity Provider.
 
@@ -31,6 +31,7 @@ More information on setup, configuration and migration can be found in the ownCl
     <screenshot>https://raw.githubusercontent.com/owncloud/screenshots/master/openidconnect/openidconnect.png</screenshot>
     <dependencies>
         <owncloud min-version="10" max-version="10"/>
+        <php min-version="7.1" />
     </dependencies>
     <types>
         <authentication/>
