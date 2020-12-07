@@ -31,7 +31,7 @@ config = {
 				'7.2',
 			],
             'databases': [
-                'mariadb:10.2', 'mysql:5.5', 'mysql:5.7', 'postgres:9.4', 'oracle'
+                'mariadb:10.2', 'mysql:5.5', 'mysql:5.7', 'mysql:8.0', 'postgres:9.4', 'oracle'
             ],
 			'coverage': False
 		},
