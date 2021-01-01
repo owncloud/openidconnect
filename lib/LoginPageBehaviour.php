@@ -67,7 +67,7 @@ class LoginPageBehaviour {
 		if (\substr($uri, -6) === '/login') {
 			$req = $this->request->getRequestUri();
 			$this->logger->debug("Redirecting to IdP - request url: $req");
-			$loginUrl = $this->urlGenerator->linkToRoute('openidconnect.loginFlow.login');
+			$loginUrl = $this->urlGenerator->linkToRoute('openidconnect.loginFlow.login', $this->request->getParams());
 			$this->redirect($loginUrl);
 		}
 	}
@@ -88,7 +88,7 @@ class LoginPageBehaviour {
 	public function registerAlternativeLogin(string $loginName): void {
 		OC_App::registerLogIn([
 			'name' => $loginName,
-			'href' => $this->urlGenerator->linkToRoute('openidconnect.loginFlow.login'),
+			'href' => $this->urlGenerator->linkToRoute('openidconnect.loginFlow.login', $this->request->getParams()),
 		]);
 	}
 }

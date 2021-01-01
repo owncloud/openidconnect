@@ -151,9 +151,15 @@ class Client extends OpenIDConnectClient {
 
 	/**
 	 * @codeCoverageIgnore
+	 *
+	 * @param string $redirect_url
 	 */
-	public function authenticate() : bool {
-		$redirectUrl = $this->generator->linkToRouteAbsolute('openidconnect.loginFlow.login');
+	public function authenticate($redirect_url = null) : bool {
+		$params = [];
+		if ($redirect_url) {
+			$params['redirect_url'] = $redirect_url;
+		}
+		$redirectUrl = $this->generator->linkToRouteAbsolute('openidconnect.loginFlow.login', $params);
 
 		$openIdConfig = $this->getOpenIdConfig();
 		if (isset($openIdConfig['redirect-url'])) {

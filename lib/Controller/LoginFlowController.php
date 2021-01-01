@@ -121,7 +121,7 @@ class LoginFlowController extends Controller {
 		}
 		try {
 			$this->logger->debug('Before openid->authenticate');
-			$openid->authenticate();
+			$openid->authenticate($this->request->getParam('redirect_url'));
 		} catch (OpenIDConnectClientException $ex) {
 			$this->logger->logException($ex);
 			throw new HintException('Error in OpenIdConnect:' . $ex->getMessage());
