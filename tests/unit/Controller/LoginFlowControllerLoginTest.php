@@ -154,6 +154,28 @@ class LoginFlowControllerLoginTest extends TestCase {
 
 		$response = $this->controller->login();
 
-		self::assertInstanceOf(RedirectResponse::class, $response);
+		self::assertEquals('http://localhost/index.php/apps/files/', $response->getRedirectURL());
+	}
+
+	public function testLoginCreateSuccessWithRedirect(): void {
+		$this->client->method('getOpenIdConfig')->willReturn([]);
+		$this->client->method('getUserInfo')->willReturn((object)['email' => 'foo@exmaple.net']);
+		$this->client->method('getIdToken')->willReturn('id');
+		$this->client->method('getAccessToken')->willReturn('access');
+		$this->client->method('getRefreshToken')->willReturn('refresh');
+		$this->client->method('readRedirectUrl')->willReturn('index.php/apps/oauth2/foo/bla');
+		$user = $this->createMock(IUser::class);
+		$this->userLookup->method('lookupUser')->willReturn($user);
+		$this->userSession->method('createSessionToken')->willReturn(true);
+		$this->userSession->method('loginUser')->willReturn(true);
+		$this->session->expects(self::exactly(3))->method('set')->withConsecutive(
+			['oca.openid-connect.id-token', 'id'],
+			['oca.openid-connect.access-token', 'access'],
+			['oca.openid-connect.refresh-token', 'refresh']
+		);
+
+		$response = $this->controller->login();
+
+		self::assertEquals('http://localhost/index.php/apps/oauth2/foo/bla', $response->getRedirectURL());
 	}
 }
