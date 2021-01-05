@@ -22,6 +22,7 @@
 namespace OCA\OpenIdConnect;
 
 use Jumbojett\OpenIDConnectClient;
+use Jumbojett\OpenIDConnectClientException;
 use OCP\IConfig;
 use OCP\ISession;
 use OCP\IURLGenerator;
@@ -89,7 +90,7 @@ class Client extends OpenIDConnectClient {
 	}
 
 	/**
-	 * @throws \Jumbojett\OpenIDConnectClientException
+	 * @throws OpenIDConnectClientException
 	 */
 	public function getWellKnownConfig() {
 		if (!$this->wellKnownConfig) {
@@ -106,6 +107,16 @@ class Client extends OpenIDConnectClient {
 		}
 
 		return $this->requestUserInfo();
+	}
+
+	public function storeRedirectUrl(?string $redirectUrl): void {
+		if ($redirectUrl) {
+			$this->setSessionKey('openid_connect_redirect_url', $redirectUrl);
+		}
+	}
+
+	public function readRedirectUrl(): ?string {
+		return $this->getSessionKey('openid_connect_redirect_url');
 	}
 
 	/**
@@ -152,14 +163,11 @@ class Client extends OpenIDConnectClient {
 	/**
 	 * @codeCoverageIgnore
 	 *
-	 * @param string $redirect_url
+	 * @return bool
+	 * @throws OpenIDConnectClientException
 	 */
-	public function authenticate($redirect_url = null) : bool {
-		$params = [];
-		if ($redirect_url) {
-			$params['redirect_url'] = $redirect_url;
-		}
-		$redirectUrl = $this->generator->linkToRouteAbsolute('openidconnect.loginFlow.login', $params);
+	public function authenticate() : bool {
+		$redirectUrl = $this->generator->linkToRouteAbsolute('openidconnect.loginFlow.login');
 
 		$openIdConfig = $this->getOpenIdConfig();
 		if (isset($openIdConfig['redirect-url'])) {
