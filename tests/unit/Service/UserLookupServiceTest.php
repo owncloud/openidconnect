@@ -25,6 +25,7 @@ namespace OCA\OpenIdConnect\Tests\Unit\Service;
 use OC\HintException;
 use OC\User\LoginException;
 use OCA\OpenIdConnect\Client;
+use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\IUser;
 use OCP\IUserManager;
@@ -45,13 +46,18 @@ class UserLookupServiceTest extends TestCase {
 	 * @var MockObject | IUserManager
 	 */
 	private $manager;
+	/**
+	 * @var AutoProvisioningService|MockObject
+	 */
+	private $autoProvisioningService;
 
 	protected function setUp(): void {
 		parent::setUp();
 		$this->client = $this->createMock(Client::class);
 		$this->manager = $this->createMock(IUserManager::class);
+		$this->autoProvisioningService = $this->createMock(AutoProvisioningService::class);
 
-		$this->userLookup = new UserLookupService($this->manager, $this->client);
+		$this->userLookup = new UserLookupService($this->manager, $this->client, $this->autoProvisioningService);
 	}
 
 	public function testNotConfigured(): void {

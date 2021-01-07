@@ -51,6 +51,30 @@ $CONFIG = [
 ];
 ```
 
+### Setup auto provisioning mode
+The auto provisioning mode will create a user based on the provided user information as returned by the OpenID Connect provider.
+The config parameters 'mode' and 'search-attribute' will be used to create a unique user so that the lookup mechanism can find the user again.
+```php
+<?php
+$CONFIG = [
+  'openid-connect' => [
+    'auto-provision' => [
+      // explicit enable the auto provisioning mode
+      'enable' => true, 
+      // documentation about standard claims: https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims
+      // only relevant in userid mode,  defines the claim which holds the email of the user
+      'email-claim' => 'email', 
+      // defines the claim which holds the display name of the user
+      'display-name-claim' => 'given_name', 
+      // defines the claim which holds the picture of the user - must be a URL
+      'picture-claim' => 'picture', 
+      // defines a list of groups to which the newly created user will be added automatically
+      'groups' => ['admin', 'guests', 'employees'], 
+    ]
+  ]
+];
+```
+
 #### All Configuration Values explained
 
 - loginButtonName - the name as displayed on the login screen which is used to redirect to the IdP
