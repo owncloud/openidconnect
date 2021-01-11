@@ -60,7 +60,7 @@ $CONFIG = [
   'openid-connect' => [
     'auto-provision' => [
       // explicit enable the auto provisioning mode
-      'enable' => true, 
+      'enabled' => true, 
       // documentation about standard claims: https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims
       // only relevant in userid mode,  defines the claim which holds the email of the user
       'email-claim' => 'email', 
