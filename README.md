@@ -1,4 +1,7 @@
 # OpenId Connect for ownCloud
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=owncloud_openidconnect&metric=alert_status)](https://sonarcloud.io/dashboard?id=owncloud_openidconnect)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=owncloud_openidconnect&metric=security_rating)](https://sonarcloud.io/dashboard?id=owncloud_openidconnect)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=owncloud_openidconnect&metric=coverage)](https://sonarcloud.io/dashboard?id=owncloud_openidconnect)
 
 ## Configuration
 
