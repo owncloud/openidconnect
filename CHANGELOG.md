@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] - XXXX-XX-XX
 
+- 
+
+## [2.0.0] - 2021-01-10
+
+### Added
+
+- Import user from openid provider: Auto provisioning mode - [#85](https://github.com/owncloud/openidconnect/issues/85)
+- Azure AD: Use access token payload instead of user info endpoint - [#103](https://github.com/owncloud/openidconnect/issues/103)
+- Limit OpenID Connect logins to users of specific user backend - [#100](https://github.com/owncloud/openidconnect/issues/100)
+
+### Changed
+
+- Message: Object of class OCA\OpenIdConnect\Application could not be converted to string - [#112](https://github.com/owncloud/openidconnect/issues/112)
+- Properly handle token expiry in the sabre dav auth backend - [#106](https://github.com/owncloud/openidconnect/issues/106)
+- Properly evaluate the config setting use-token-introspection-endpoint [#98](https://github.com/owncloud/openidconnect/issues/98)
+- Use built-in session functions of the OpenID Connect Library - [#97](https://github.com/owncloud/openidconnect/issues/97)
+- Bump libraries
+
 ## [1.0.0] - 2020-10-16
 
 ### Added
@@ -33,6 +51,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 - Initial Release
 
-[Unreleased]: https://github.com/owncloud/openidconnect/compare/v1.0.0...master
+[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.0.0...master
+[2.0.0]: https://github.com/owncloud/openidconnect/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/owncloud/openidconnect/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/owncloud/openidconnect/compare/0.1.0...v0.2.0
