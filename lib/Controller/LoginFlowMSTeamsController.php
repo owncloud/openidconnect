@@ -37,7 +37,7 @@ use OCP\IUserSession;
 
 class LoginFlowMSTeamsController extends OIDCLoginFlowController {
 	/**
-	 * @var Session
+	 * @var ISession
 	 */
 	private $userSession;
 
