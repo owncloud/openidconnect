@@ -31,9 +31,11 @@ use OCA\OpenIdConnect\Controller\LoginFlowController;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\ICacheFactory;
+use OCP\IConfig;
 use OCP\ILogger;
 use OCP\IRequest;
 use OCP\ISession;
+use OCP\IURLGenerator;
 use OCP\IUser;
 use OCP\IUserSession;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -73,6 +75,14 @@ class LoginFlowControllerLoginTest extends TestCase {
 	 * @var MockObject | ICacheFactory
 	 */
 	private $memCacheFactory;
+	/**
+	 * @var MockObject | IConfig
+	 */
+	private $config;
+	/**
+	 * @var MockObject | IURLGenerator
+	 */
+	private $urlGenerator;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -83,10 +93,12 @@ class LoginFlowControllerLoginTest extends TestCase {
 		$this->logger = $this->createMock(ILogger::class);
 		$this->client = $this->createMock(Client::class);
 		$this->memCacheFactory = $this->createMock(ICacheFactory::class);
+		$this->config = $this->createMock(IConfig::class);
+		$this->urlGenerator = $this->createMock(IURLGenerator::class);
 
 		$this->controller = new LoginFlowController(
 			'openidconnect',
-			$this->request, $this->userLookup, $this->userSession, $this->session, $this->logger, $this->client, $this->memCacheFactory
+			$this->request, $this->userLookup, $this->userSession, $this->session, $this->logger, $this->client, $this->memCacheFactory, $this->config, $this->urlGenerator
 		);
 	}
 
