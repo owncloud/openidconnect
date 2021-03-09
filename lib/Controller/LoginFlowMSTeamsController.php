@@ -21,7 +21,6 @@
  */
 namespace OCA\OpenIdConnect\Controller;
 
-use OC\User\Session;
 use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\Controller\LoginFlowController as OIDCLoginFlowController;
 use OCA\OpenIdConnect\Service\UserLookupService;
