@@ -30,5 +30,10 @@ return [
 		['name' => 'loginFlow#login', 'url' => '/redirect', 'verb' => 'GET'],
 		// front channel logout url
 		['name' => 'loginFlow#logout', 'url' => '/logout', 'verb' => 'GET'],
+
+		// ms-teams custom auth flow
+		['name' => 'loginFlowMSTeams#index', 'url' => '/teams', 'verb' => 'GET'],
+		['name' => 'loginFlowMSTeams#finalize', 'url' => '/teams/finalize', 'verb' => 'GET'],
+		['name' => 'loginFlowMSTeams#login', 'url' => '/teams/redirect', 'verb' => 'GET'],
 	]
 ];

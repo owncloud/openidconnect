@@ -148,19 +148,4 @@ class Client extends OpenIDConnectClient {
 		// TODO: see how to use ownCloud HttpClient ....
 		return parent::fetchURL($url, $post_body, $headers);
 	}
-
-	/**
-	 * @codeCoverageIgnore
-	 */
-	public function authenticate() : bool {
-		$redirectUrl = $this->generator->linkToRouteAbsolute('openidconnect.loginFlow.login');
-
-		$openIdConfig = $this->getOpenIdConfig();
-		if (isset($openIdConfig['redirect-url'])) {
-			$redirectUrl = $openIdConfig['redirect-url'];
-		}
-
-		$this->setRedirectURL($redirectUrl);
-		return parent::authenticate();
-	}
 }

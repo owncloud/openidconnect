@@ -33,9 +33,11 @@ use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\Response;
 use OCP\ICacheFactory;
+use OCP\IConfig;
 use OCP\ILogger;
 use OCP\IRequest;
 use OCP\ISession;
+use OCP\IURLGenerator;
 use OCP\IUserSession;
 use OCP\Util;
 
@@ -73,7 +75,9 @@ class LoginFlowController extends Controller {
 								ISession $session,
 								ILogger $logger,
 								Client $client,
-								ICacheFactory $memCacheFactory
+								ICacheFactory $memCacheFactory,
+								IConfig $config,
+								IURLGenerator $generator
 	) {
 		parent::__construct($appName, $request);
 		if (!$userSession instanceof Session) {
@@ -86,6 +90,9 @@ class LoginFlowController extends Controller {
 		$this->client = $client;
 		$this->logger = new Logger($logger);
 		$this->memCacheFactory = $memCacheFactory;
+
+		$openIdConfig = $config->getSystemValue('openid-connect', null);
+		$this->client->setRedirectURL(isset($openIdConfig['redirect-url']) ? $openIdConfig['redirect-url'] : $generator->linkToRouteAbsolute('openidconnect.loginFlow.login'));
 	}
 
 	/**

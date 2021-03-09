@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] - XXXX-XX-XX
 
-- 
+- Integrate Microsoft Teams JavaScript client SDK and provide route to authenticate within ms-teams.
 
 ## [2.0.0] - 2021-01-10
 

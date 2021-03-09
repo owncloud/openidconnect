@@ -1,0 +1,15 @@
+body {
+    background-attachment: fixed;
+    height: 100%;
+    text-align: center;
+    background-image: url('/core/img/background.jpg');
+    background-position: right bottom;
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+
+button {
+    margin: 0;
+    position: absolute;
+    top: 50%;
+}
