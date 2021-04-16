@@ -82,13 +82,31 @@ class AutoProvisioningService {
 			throw new LoginException("Configured attribute $attribute is not known.");
 		}
 		$userId = $this->mode() === 'email' ? $this->generateUserId() : $emailOrUserId;
+
+		$openIdConfig = $this->getOpenIdConfiguration();
+		$provisioningClaim = $openIdConfig['auto-provision']['provisioning-claim'] ?? null;
+		if ($provisioningClaim) {
+			$this->logger->debug('ProvisioningClaim is defined for auto-provision', ['claim' => $provisioningClaim]);
+			$provisioningAttribute = $openIdConfig['auto-provision']['provisioning-attribute'] ?? null;
+
+			if (!\property_exists($userInfo, $provisioningClaim) || !\is_array($userInfo->$provisioningClaim)) {
+				throw new LoginException('Required provisioning attribute is not found.');
+			}
+
+			if (!\in_array($provisioningAttribute, $userInfo->$provisioningClaim, true)) {
+				throw new LoginException('Required provisioning attribute is not found.');
+			}
+		}
+
+		$userId = $this->mode() === 'email' ? \uniqid('oidc-user-') : $emailOrUserId;
+		$passwd = \uniqid('', true);
 		$email = $this->mode() === 'email' ? $emailOrUserId : null;
 		$user = $this->userManager->createUser($userId, $this->generatePassword());
 		if (!$user) {
 			throw new LoginException("Unable to create user $userId");
 		}
 		$user->setEnabled(true);
-		$openIdConfig = $this->getOpenIdConfiguration();
+
 		if ($email) {
 			$user->setEMailAddress($email);
 		} else {

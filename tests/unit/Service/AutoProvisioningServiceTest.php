@@ -163,6 +163,11 @@ class AutoProvisioningServiceTest extends TestCase {
 			[true, false, true, false, false, ['mode' => 'userid', 'auto-provision' => ['enabled' => true, 'display-name-claim' => 'name']], (object)['email' => 'alice@example.net', 'name' => 'Alice']],
 			[true, false, false, true, false, ['mode' => 'userid', 'auto-provision' => ['enabled' => true, 'picture-claim' => 'picture']], (object)['email' => 'alice@example.net', 'picture' => 'http://']],
 			[true, false, false, false, true, ['mode' => 'userid', 'auto-provision' => ['enabled' => true, 'groups' => ['oidc-group']]], (object)['email' => 'alice@example.net', 'picture' => 'http://']],
+			[true, false, false, false, false, ['auto-provision' => ['enabled' => true, 'provisioning-claim' => 'foo', 'provisioning-attribute' => 'bar']], (object)['email' => 'alice@example.net', 'foo' => ['bar']]],
+			[false, false, false, false, false, ['auto-provision' => ['enabled' => true, 'provisioning-claim' => 'foo']], (object)['email' => 'alice@example.net', 'foo' => ['bar']]],
+			[false, false, false, false, false, ['auto-provision' => ['enabled' => true, 'provisioning-claim' => 'foo']], (object)['email' => 'alice@example.net', 'foo' => 'must-be-array']],
+			[false, false, false, false, false, ['auto-provision' => ['enabled' => true, 'provisioning-claim' => 'foo']], (object)['email' => 'alice@example.net', 'foo' => null]],
+			[false, false, false, false, false, ['auto-provision' => ['enabled' => true, 'provisioning-claim' => 'foo']], (object)['email' => 'alice@example.net']],
 		];
 	}
 }
