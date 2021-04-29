@@ -121,6 +121,7 @@ class LoginFlowController extends Controller {
 		}
 		try {
 			$this->logger->debug('Before openid->authenticate');
+			$openid->storeRedirectUrl($this->request->getParam('redirect_url'));
 			$openid->authenticate();
 		} catch (OpenIDConnectClientException $ex) {
 			$this->logger->logException($ex);
@@ -220,6 +221,14 @@ class LoginFlowController extends Controller {
 	 * @return string
 	 */
 	protected function getDefaultUrl(): string {
+		$openid = $this->getOpenIdConnectClient();
+		if ($openid) {
+			$redirectUrl = $openid->readRedirectUrl();
+			if ($redirectUrl) {
+				$_REQUEST['redirect_url'] = $redirectUrl;
+			}
+		}
+
 		return \OC_Util::getDefaultPageUrl();
 	}
 
