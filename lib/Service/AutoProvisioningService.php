@@ -1,6 +1,7 @@
 <?php
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
+ * @author Ilja Neumann <ineumann@owncloud.com>
  *
  * @copyright Copyright (c) 2020, ownCloud GmbH
  * @license GPL-2.0
@@ -80,10 +81,9 @@ class AutoProvisioningService {
 		if (!$emailOrUserId) {
 			throw new LoginException("Configured attribute $attribute is not known.");
 		}
-		$userId = $this->mode() === 'email' ? \uniqid('oidc-user-') : $emailOrUserId;
-		$passwd = \uniqid('', true);
+		$userId = $this->mode() === 'email' ? $this->generateUserId() : $emailOrUserId;
 		$email = $this->mode() === 'email' ? $emailOrUserId : null;
-		$user = $this->userManager->createUser($userId, $passwd);
+		$user = $this->userManager->createUser($userId, $this->generatePassword());
 		if (!$user) {
 			throw new LoginException("Unable to create user $userId");
 		}
@@ -144,5 +144,13 @@ class AutoProvisioningService {
 	protected function downloadPicture(string $pictureUrl) {
 		$response = $this->clientService->newClient()->get($pictureUrl);
 		return $response->getBody();
+	}
+
+	private function generateUserId() {
+		return 'oidc-user-'.\bin2hex(\random_bytes(16));
+	}
+
+	private function generatePassword() {
+		return \bin2hex(\random_bytes(32));
 	}
 }
