@@ -79,7 +79,8 @@ class AutoProvisioningServiceTest extends TestCase {
 		$this->logger = $this->createMock(ILogger::class);
 		$this->config = $this->createMock(IConfig::class);
 
-		$this->autoProvisioningService = new AutoProvisioningService($this->userManager,
+		$this->autoProvisioningService = new AutoProvisioningService(
+			$this->userManager,
 			$this->groupManager,
 			$this->avatarManager,
 			$this->clientService,
@@ -119,11 +120,15 @@ class AutoProvisioningServiceTest extends TestCase {
 	 * @param object $userInfo
 	 * @throws LoginException
 	 */
-	public function testCreateUser(bool $expectsUserToBeCreated,
-								   bool $expectEmailToBeSet,
-								   bool $expectDisplayName,
-								   bool $expectsAvatar, bool $expectsGroupMembership,
-								   array $config, object $userInfo): void {
+	public function testCreateUser(
+		bool $expectsUserToBeCreated,
+		bool $expectEmailToBeSet,
+		bool $expectDisplayName,
+		bool $expectsAvatar,
+		bool $expectsGroupMembership,
+		array $config,
+		object $userInfo
+	): void {
 		if ($expectsUserToBeCreated) {
 			$user = $this->createMock(IUser::class);
 			$user->expects($expectEmailToBeSet ? self::once() : self::never())->method('setEMailAddress');

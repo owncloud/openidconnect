@@ -61,11 +61,13 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	 * @param UserLookupService $lookupService
 	 * @param Client $client
 	 */
-	public function __construct(IUserManager $manager,
-								   ILogger $logger,
-								   ICacheFactory $cacheFactory,
-								   UserLookupService $lookupService,
-								   Client $client) {
+	public function __construct(
+		IUserManager $manager,
+		ILogger $logger,
+		ICacheFactory $cacheFactory,
+		UserLookupService $lookupService,
+		Client $client
+	) {
 		$this->manager = $manager;
 		$this->logger = new Logger($logger);
 		$this->cacheFactory = $cacheFactory;
