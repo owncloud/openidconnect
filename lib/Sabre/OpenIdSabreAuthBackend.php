@@ -30,7 +30,7 @@ use OCP\IUserSession;
 use Sabre\DAV\Auth\Backend\AbstractBearer;
 
 class OpenIdSabreAuthBackend extends AbstractBearer {
-	const DAV_AUTHENTICATED = Auth::DAV_AUTHENTICATED;
+	public const DAV_AUTHENTICATED = Auth::DAV_AUTHENTICATED;
 
 	/**
 	 * This is the prefix that will be used to generate principal urls.
@@ -61,11 +61,13 @@ class OpenIdSabreAuthBackend extends AbstractBearer {
 	 * @param string $principalPrefix The principal prefix.
 	 * @throws \Exception
 	 */
-	public function __construct(ISession $session,
-								IUserSession $userSession,
-								IRequest $request,
-								OpenIdConnectAuthModule $authModule,
-								$principalPrefix = 'principals/users/') {
+	public function __construct(
+		ISession $session,
+		IUserSession $userSession,
+		IRequest $request,
+		OpenIdConnectAuthModule $authModule,
+		$principalPrefix = 'principals/users/'
+	) {
 		if (!$userSession instanceof Session) {
 			throw new \Exception('We rely on internal implementation!');
 		}

@@ -58,12 +58,14 @@ class AutoProvisioningService {
 	 */
 	private $clientService;
 
-	public function __construct(IUserManager $userManager,
-								IGroupManager $groupManager,
-								IAvatarManager $avatarManager,
-								IClientService $clientService,
-								ILogger $logger,
-								IConfig $config) {
+	public function __construct(
+		IUserManager $userManager,
+		IGroupManager $groupManager,
+		IAvatarManager $avatarManager,
+		IClientService $clientService,
+		ILogger $logger,
+		IConfig $config
+	) {
 		$this->userManager = $userManager;
 		$this->groupManager = $groupManager;
 		$this->avatarManager = $avatarManager;

@@ -82,7 +82,13 @@ class LoginFlowControllerLogoutTest extends TestCase {
 
 		$this->controller = new LoginFlowController(
 			'openidconnect',
-			$this->request, $this->userLookup, $this->userSession, $this->session, $this->logger, $this->client, $this->memCacheFactory
+			$this->request,
+			$this->userLookup,
+			$this->userSession,
+			$this->session,
+			$this->logger,
+			$this->client,
+			$this->memCacheFactory
 		);
 	}
 

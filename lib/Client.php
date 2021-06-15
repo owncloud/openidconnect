@@ -47,9 +47,10 @@ class Client extends OpenIDConnectClient {
 	 * @param IURLGenerator $generator
 	 * @param ISession $session
 	 */
-	public function __construct(IConfig $config,
-								IURLGenerator $generator,
-								ISession $session
+	public function __construct(
+		IConfig $config,
+		IURLGenerator $generator,
+		ISession $session
 	) {
 		$this->session = $session;
 		$this->config = $config;

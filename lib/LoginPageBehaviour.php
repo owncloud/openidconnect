@@ -36,10 +36,12 @@ class LoginPageBehaviour {
 	/** @var IRequest */
 	private $request;
 
-	public function __construct(Logger $logger,
-								IUserSession $userSession,
-								IURLGenerator $urlGenerator,
-								IRequest $request) {
+	public function __construct(
+		Logger $logger,
+		IUserSession $userSession,
+		IURLGenerator $urlGenerator,
+		IRequest $request
+	) {
 		$this->logger = $logger;
 		$this->userSession = $userSession;
 		$this->urlGenerator = $urlGenerator;

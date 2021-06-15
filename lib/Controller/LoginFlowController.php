@@ -66,14 +66,15 @@ class LoginFlowController extends Controller {
 	 */
 	private $memCacheFactory;
 
-	public function __construct(string $appName,
-								IRequest $request,
-								UserLookupService $userLookup,
-								IUserSession $userSession,
-								ISession $session,
-								ILogger $logger,
-								Client $client,
-								ICacheFactory $memCacheFactory
+	public function __construct(
+		string $appName,
+		IRequest $request,
+		UserLookupService $userLookup,
+		IUserSession $userSession,
+		ISession $session,
+		ILogger $logger,
+		Client $client,
+		ICacheFactory $memCacheFactory
 	) {
 		parent::__construct($appName, $request);
 		if (!$userSession instanceof Session) {
