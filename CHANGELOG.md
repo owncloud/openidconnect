@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 - Provision accounts based on auto-provisioning claim - [#149](https://github.com/owncloud/openidconnect/issues/149)
 
+- Add app db table as additional, optional config storage - [#67](https://github.com/owncloud/openidconnect/pull/167)
+
 ## [2.0.0] - 2021-01-10
 
 ### Added

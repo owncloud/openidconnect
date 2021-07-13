@@ -29,6 +29,8 @@ use OC\HintException;
 use OCP\AppFramework\App;
 
 class Application extends App {
+	public const APPID = 'openidconnect';
+
 	/** @var Logger */
 	private $logger;
 
@@ -39,7 +41,7 @@ class Application extends App {
 	 * @codeCoverageIgnore
 	 */
 	public function __construct(array $urlParams = []) {
-		parent::__construct('openidconnect', $urlParams);
+		parent::__construct(Application::APPID, $urlParams);
 	}
 
 	/**
