@@ -26,6 +26,7 @@ use OCA\OpenIdConnect\Client;
 use OCP\IConfig;
 use OCP\ISession;
 use OCP\IURLGenerator;
+use OCP\ILogger;
 use PHPUnit\Framework\MockObject\MockObject;
 use Test\TestCase;
 
@@ -44,6 +45,10 @@ class ClientTest extends TestCase {
 	 */
 	private $urlGenerator;
 	/**
+	 * @var MockObject | ILogger
+	 */
+	private $logger;
+	/**
 	 * @var MockObject | IConfig
 	 */
 	private $config;
@@ -55,14 +60,22 @@ class ClientTest extends TestCase {
 		];
 	}
 
+	public function appConfigProvider(): \Generator {
+		yield 'invalid json' => ['from system config', '{[s', 'Loaded config from DB is not valid (malformed JSON); JSON Last Error: 4'];
+		yield 'empty app config' => ['from system config', ''];
+		yield 'empty array' => [[], '[]'];
+		yield 'json object' => [['foo' => 'bar'], '{"foo": "bar"}'];
+	}
+
 	protected function setUp(): void {
 		parent::setUp();
 		$this->config = $this->createMock(IConfig::class);
 		$this->urlGenerator = $this->createMock(IURLGenerator::class);
 		$this->session = $this->createMock(ISession::class);
+		$this->logger = $this->createMock(ILogger::class);
 
 		$this->client = $this->getMockBuilder(Client::class)
-			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session])
+			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger])
 			->setMethods(['fetchURL'])
 			->getMock();
 	}
@@ -71,6 +84,21 @@ class ClientTest extends TestCase {
 		$this->config->expects(self::once())->method('getSystemValue')->willReturn('foo');
 		$return = $this->client->getOpenIdConfig();
 		self::assertEquals('foo', $return);
+	}
+
+	/**
+	 * @dataProvider appConfigProvider
+	 */
+	public function testGetAppConfig($expectedData, $dataInConfig, $expectedErrorMessage = null): void {
+		$this->config->method('getSystemValue')->willReturn('from system config');
+		$this->config->expects(self::once())->method('getAppValue')->willReturnCallback(function ($app, $key, $default) use ($dataInConfig) {
+			return $dataInConfig;
+		});
+		if ($expectedErrorMessage) {
+			$this->logger->expects(self::once())->method('error')->with($expectedErrorMessage);
+		}
+		$return = $this->client->getOpenIdConfig();
+		self::assertEquals($expectedData, $return);
 	}
 
 	public function testGetWellKnown(): void {
@@ -97,7 +125,7 @@ class ClientTest extends TestCase {
 			throw new \InvalidArgumentException("Unexpected key: $key");
 		});
 		$this->client = $this->getMockBuilder(Client::class)
-			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session])
+			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger])
 			->setMethods(['fetchURL'])
 			->getMock();
 
@@ -124,7 +152,7 @@ class ClientTest extends TestCase {
 			throw new \InvalidArgumentException("Unexpected key: $key");
 		});
 		$this->client = $this->getMockBuilder(Client::class)
-			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session])
+			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger])
 			->setMethods(['fetchURL'])
 			->getMock();
 
@@ -151,7 +179,7 @@ class ClientTest extends TestCase {
 		});
 
 		$this->client = $this->getMockBuilder(Client::class)
-			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session])
+			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger])
 			->onlyMethods(['requestUserInfo', 'getAccessTokenPayload'])
 			->getMock();
 		if ($useAccessTokenPayloadForUserInfo) {
