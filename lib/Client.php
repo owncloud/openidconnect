@@ -183,6 +183,13 @@ class Client extends OpenIDConnectClient {
 
 	/**
 	 * @codeCoverageIgnore
+	 */
+	public function getCodeChallengeMethod() {
+		return 'S256';
+	}
+
+	/**
+	 * @codeCoverageIgnore
 	 *
 	 * @return bool
 	 * @throws OpenIDConnectClientException
