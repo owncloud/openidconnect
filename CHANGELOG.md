@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] - XXXX-XX-XX
 
+- PKCE Flow challenge was not used - [#170](https://github.com/owncloud/openidconnect/pull/170)
+
 - Use random_bytes to generate auto-provisioning user-id and password - [#154](https://github.com/owncloud/openidconnect/issues/154)
 
 - Provision accounts based on auto-provisioning claim - [#149](https://github.com/owncloud/openidconnect/issues/149)
