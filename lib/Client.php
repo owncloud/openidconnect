@@ -127,6 +127,10 @@ class Client extends OpenIDConnectClient {
 			return $this->getAccessTokenPayload();
 		}
 
+		if (isset($openIdConfig['use-id-token-payload-for-user-info']) && $openIdConfig['use-id-token-payload-for-user-info']) {
+			return $this->getIdTokenPayload();
+		}
+
 		return $this->requestUserInfo();
 	}
 

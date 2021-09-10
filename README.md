@@ -131,7 +131,7 @@ $CONFIG = [
 - search-attribute - the attribute which is taken from the access token JWT or user info endpoint to identify the user
 - allowed-user-backends - limit the users which are allowed to login to a specific user backend - e.g. LDAP
 - use-access-token-payload-for-user-info - if set to true any user information will be read from the access token. If set to false the userinfo endpoint is used (starting app version 1.1.0)
-
+- use-id-token-payload-for-user-info - if set to true any user information will be read from the access token. If set to false the userinfo endpoint is used (starting app version 1.1.0)
 
 ### Setup within the OpenId Provider
 When registering ownCloud as OpenId Client use ```https://cloud.example.net/index.php/apps/openidconnect/redirect``` as redirect url .
