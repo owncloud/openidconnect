@@ -4,14 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased] - XXXX-XX-XX
+## [2.1.0] - 2021-09-13
 
 - PKCE Flow challenge was not used - [#170](https://github.com/owncloud/openidconnect/pull/170)
-
 - Use random_bytes to generate auto-provisioning user-id and password - [#154](https://github.com/owncloud/openidconnect/issues/154)
-
 - Provision accounts based on auto-provisioning claim - [#149](https://github.com/owncloud/openidconnect/issues/149)
-
 - Add app db table as additional, optional config storage - [#67](https://github.com/owncloud/openidconnect/pull/167)
 
 ## [2.0.0] - 2021-01-10
@@ -58,6 +55,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 - Initial Release
 
 [Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.0.0...master
+[2.1.0]: https://github.com/owncloud/openidconnect/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/owncloud/openidconnect/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/owncloud/openidconnect/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/owncloud/openidconnect/compare/0.1.0...v0.2.0
