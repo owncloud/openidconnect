@@ -23,7 +23,7 @@ namespace OCA\OpenIdConnect;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use Jumbojett\OpenIDConnectClientException;
+use JuliusPC\OpenIDConnectClientException;
 use OC;
 use OC\HintException;
 use OCP\AppFramework\App;

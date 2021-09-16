@@ -21,7 +21,7 @@
  */
 namespace OCA\OpenIdConnect;
 
-use Jumbojett\OpenIDConnectClientException;
+use JuliusPC\OpenIDConnectClientException;
 use OC\User\LoginException;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\Authentication\IAuthModule;

@@ -22,7 +22,6 @@
 
 namespace OCA\OpenIdConnect\Tests\Unit\Service;
 
-use OC\Avatar;
 use OC\User\LoginException;
 use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCP\Http\Client\IClient;

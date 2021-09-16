@@ -21,7 +21,7 @@
  */
 namespace OCA\OpenIdConnect;
 
-use Jumbojett\OpenIDConnectClientException;
+use JuliusPC\OpenIDConnectClientException;
 use OC\HintException;
 use OCP\ICache;
 use OCP\ICacheFactory;
