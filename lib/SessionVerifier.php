@@ -103,6 +103,20 @@ class SessionVerifier {
 			$introspectionClientId = $openIdConfig['token-introspection-endpoint-client-id'] ?? null;
 			$introspectionClientSecret = $openIdConfig['token-introspection-endpoint-client-secret'] ?? null;
 
+			if (isset($openIdConfig['exchange-token-mode-before-introspection'])) {
+				$mode = $openIdConfig['exchange-token-mode-before-introspection'];
+				$token = $mode === 'refresh-token' ? $this->session->get('oca.openid-connect.refresh-token') : $this->session->get('oca.openid-connect.access-token');
+				$this->logger->debug("Starting token-exchange to verify session with subject_token mode: $mode");
+
+				try {
+					$accessToken = $this->client->exchangeToken($token, $mode);
+				} catch (\Exception $e) {
+					$this->logger->debug("Token Exchange failed, logout: " . $e->getMessage());
+					$this->logout();
+					return;
+				}
+			}
+
 			$introData = $client->introspectToken($accessToken, '', $introspectionClientId, $introspectionClientSecret);
 			$this->logger->debug('Introspection info: ' . \json_encode($introData) . ' for access token:' . $accessToken);
 			if (\property_exists($introData, 'error')) {
