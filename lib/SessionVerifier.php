@@ -103,6 +103,11 @@ class SessionVerifier {
 			$introspectionClientId = $openIdConfig['token-introspection-endpoint-client-id'] ?? null;
 			$introspectionClientSecret = $openIdConfig['token-introspection-endpoint-client-secret'] ?? null;
 
+
+            $refreshToken = $this->session->get('oca.openid-connect.refresh-token');
+            $resp = $this->client->requestTokenExchange($refreshToken,'urn:ietf:params:oauth:token-type:refresh_token', $this->client->getClientID());
+
+            $accessToken = $resp->access_token;
 			$introData = $client->introspectToken($accessToken, '', $introspectionClientId, $introspectionClientSecret);
 			$this->logger->debug('Introspection info: ' . \json_encode($introData) . ' for access token:' . $accessToken);
 			if (\property_exists($introData, 'error')) {
