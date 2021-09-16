@@ -22,7 +22,6 @@
 
 namespace OCA\OpenIdConnect\Tests\Unit\Sabre;
 
-use OC\HintException;
 use OC\User\LoginException;
 use OC\User\Session;
 use OCA\OpenIdConnect\OpenIdConnectAuthModule;

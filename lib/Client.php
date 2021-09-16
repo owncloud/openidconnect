@@ -21,8 +21,8 @@
  */
 namespace OCA\OpenIdConnect;
 
-use Jumbojett\OpenIDConnectClient;
-use Jumbojett\OpenIDConnectClientException;
+use JuliusPC\OpenIDConnectClient;
+use JuliusPC\OpenIDConnectClientException;
 use OCP\IConfig;
 use OCP\ISession;
 use OCP\IURLGenerator;

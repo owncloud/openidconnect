@@ -21,7 +21,7 @@
  */
 namespace OCA\OpenIdConnect\Controller;
 
-use Jumbojett\OpenIDConnectClientException;
+use JuliusPC\OpenIDConnectClientException;
 use OC\HintException;
 use OC\User\LoginException;
 use OC\User\Session;
@@ -111,7 +111,6 @@ class LoginFlowController extends Controller {
 	 * @UseSession
 	 *
 	 * @throws HintException
-	 * @throws \Jumbojett\OpenIDConnectClientException
 	 * @throws LoginException
 	 */
 	public function login(): RedirectResponse {
