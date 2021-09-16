@@ -160,7 +160,15 @@ class LoginFlowController extends Controller {
 			} else {
 				$this->logger->debug('Id token holds no sid: ' . \json_encode($openid->getIdTokenPayload()));
 			}
-			return new RedirectResponse($this->getDefaultUrl());
+			$response = new RedirectResponse($this->getDefaultUrl());
+			$openIdConfig = $openid->getOpenIdConfig();
+			$cookieName = $openIdConfig['ocis-routing-policy-cookie'] ?? 'owncloud-selector';
+			$cookieDirectives = $openIdConfig['ocis-routing-policy-cookie-directives'] ?? 'path=/;';
+			$attribute = $openIdConfig['ocis-routing-poclicy-claim'] ?? 'ocis.routing.policy';
+			if (\property_exists($userInfo, $attribute)) {
+				$response->addHeader('Set-Cookie', "$cookieName={$userInfo->$attribute};$cookieDirectives");
+			}
+			return $response;
 		}
 		$this->logger->error("Unable to login {$user->getUID()}");
 		return new RedirectResponse('/');
