@@ -90,6 +90,31 @@ class Client extends OpenIDConnectClient {
 		}
 	}
 
+	public function requestUserInfo($attribute = null) {
+		if (true) {
+			$resp = $this->requestTokenExchange(
+				$this->getRefreshToken(),
+				'urn:ietf:params:oauth:token-type:refresh_token',
+				$this->getClientID()
+			);
+
+			$accessToken = $resp->access_token;
+
+			$userInfo = $this->introspectToken($accessToken);
+			$this->userInfo = $userInfo;
+
+			if ($attribute === null) {
+				return $this->userInfo;
+			}
+
+			if (property_exists($this->userInfo, $attribute)) {
+				return $this->userInfo->$attribute;
+			}
+		}
+
+		return parent::requestUserInfo($attribute);
+	}
+
 	/**
 	 * @return mixed
 	 */
