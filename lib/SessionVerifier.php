@@ -111,8 +111,9 @@ class SessionVerifier {
 				try {
 					$accessToken = $this->client->exchangeToken($token, $mode);
 				} catch (\Exception $e) {
+					$this->logger->debug("Token Exchange failed, logout: " . $e->getMessage());
 					$this->logout();
-					throw  $e;
+					return;
 				}
 			}
 
