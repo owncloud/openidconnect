@@ -1,6 +1,7 @@
 <?php
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
+ * @author Ilja Neumann <ineumann@owncloud.com>
  *
  * @copyright Copyright (c) 2020, ownCloud GmbH
  * @license GPL-2.0
@@ -128,22 +129,44 @@ class Client extends OpenIDConnectClient {
 		}
 
 		if (isset($openIdConfig['use-access-token-introspection-for-user-info']) && $openIdConfig['use-access-token-introspection-for-user-info']) {
-			$introspectionClientId = $config['token-introspection-endpoint-client-id'] ?? null;
-			$introspectionClientSecret = $config['token-introspection-endpoint-client-secret'] ?? null;
+			$introspectionClientId = $openIdConfig['token-introspection-endpoint-client-id'] ?? null;
+			$introspectionClientSecret = $openIdConfig['token-introspection-endpoint-client-secret'] ?? null;
 			$accessToken = $this->getAccessToken();
 			if (isset($openIdConfig['exchange-token-mode-before-introspection'])) {
 				$mode = $openIdConfig['exchange-token-mode-before-introspection'];
 				$token = $mode === 'refresh-token' ? $this->getRefreshToken() : $this->getAccessToken();
-				$subjectTokenType = $mode === 'refresh-token' ? 'urn:ietf:params:oauth:token-type:refresh_token' : 'urn:ietf:params:oauth:token-type:access_token';
-				// Todo add debug logging, throw execpton in case error is returned
-				$response = $this->requestTokenExchange($token, $subjectTokenType, $this->getClientID());
-				$accessToken = $response->access_token;
+				$this->logger->debug("Starting token-exchange to get user_info with subject_token mode: $mode");
+				$accessToken = $this->exchangeToken($token, $mode);
 			}
 
-			return $this->introspectToken($accessToken, null, $introspectionClientId, $introspectionClientSecret);
+			return $this->introspectToken($accessToken, '', $introspectionClientId, $introspectionClientSecret);
 		}
 
 		return $this->requestUserInfo();
+	}
+
+
+	/**
+	 * Perform a RFC8693 Token Exchange
+	 * https://datatracker.ietf.org/doc/html/rfc8693
+	 *
+	 * @param string $subjectToken
+	 * @param string $tokenType Type of the token to exchange 'refresh-token' or 'access-token'
+	 * @return string Access Token
+	 * @throws OpenIDConnectClientException
+	 */
+	public function exchangeToken(string $subjectToken, string $tokenType): string {
+		$subjectTokenType = $tokenType === 'refresh-token' ? 'urn:ietf:params:oauth:token-type:refresh_token' : 'urn:ietf:params:oauth:token-type:access_token';
+		$exchangeResponse = $this->requestTokenExchange($subjectToken, $subjectTokenType, $this->getClientID());
+
+		if (isset($exchangeResponse->error)) {
+			if (isset($exchangeResponse->error_description)) {
+				throw new OpenIDConnectClientException('TokenExchange response: ' . $exchangeResponse->error_description);
+			}
+			throw new OpenIDConnectClientException('TokenExchange response: ' . $exchangeResponse->error);
+		}
+
+		return $exchangeResponse->access_token;
 	}
 
 	public function storeRedirectUrl(?string $redirectUrl): void {
