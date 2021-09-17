@@ -145,7 +145,6 @@ class Client extends OpenIDConnectClient {
 		return $this->requestUserInfo();
 	}
 
-
 	/**
 	 * Perform a RFC8693 Token Exchange
 	 * https://datatracker.ietf.org/doc/html/rfc8693
