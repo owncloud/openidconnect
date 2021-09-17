@@ -99,16 +99,20 @@ class Client extends OpenIDConnectClient {
 			);
 
 			$accessToken = $resp->access_token;
-
 			$userInfo = $this->introspectToken($accessToken);
-			$this->userInfo = $userInfo;
+
+			// TODO: Create Upstream PR to set this protected or create getter/setter
+			$reflection = (new \ReflectionClass($this))->getParentClass();
+			$userInfoProp = $reflection->getProperty('userInfo');
+			$userInfoProp->setAccessible(true);
+			$userInfoProp->setValue($this, $userInfo);
 
 			if ($attribute === null) {
-				return $this->userInfo;
+				return $userInfo;
 			}
 
-			if (property_exists($this->userInfo, $attribute)) {
-				return $this->userInfo->$attribute;
+			if (property_exists($userInfo, $attribute)) {
+				return $userInfo->$attribute;
 			}
 		}
 
