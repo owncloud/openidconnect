@@ -91,7 +91,8 @@ class Client extends OpenIDConnectClient {
 	}
 
 	public function requestUserInfo($attribute = null) {
-		if (true) {
+		$config = $this->getOpenIdConfig();
+		if ($config['token-exchange'] ?? false) {
 			$resp = $this->requestTokenExchange(
 				$this->getRefreshToken(),
 				'urn:ietf:params:oauth:token-type:refresh_token',
@@ -99,6 +100,7 @@ class Client extends OpenIDConnectClient {
 			);
 
 			$accessToken = $resp->access_token;
+			$this->setAccessToken($accessToken);
 			$userInfo = $this->introspectToken($accessToken);
 
 			// TODO: Create Upstream PR to set this protected or create getter/setter
