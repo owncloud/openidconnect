@@ -90,37 +90,6 @@ class Client extends OpenIDConnectClient {
 		}
 	}
 
-	public function requestUserInfo($attribute = null) {
-		$config = $this->getOpenIdConfig();
-		if ($config['token-exchange'] ?? false) {
-			$resp = $this->requestTokenExchange(
-				$this->getRefreshToken(),
-				'urn:ietf:params:oauth:token-type:refresh_token',
-				$this->getClientID()
-			);
-
-			$accessToken = $resp->access_token;
-			$this->setAccessToken($accessToken);
-			$userInfo = $this->introspectToken($accessToken);
-
-			// TODO: Create Upstream PR to set this protected or create getter/setter
-			$reflection = (new \ReflectionClass($this))->getParentClass();
-			$userInfoProp = $reflection->getProperty('userInfo');
-			$userInfoProp->setAccessible(true);
-			$userInfoProp->setValue($this, $userInfo);
-
-			if ($attribute === null) {
-				return $userInfo;
-			}
-
-			if (property_exists($userInfo, $attribute)) {
-				return $userInfo->$attribute;
-			}
-		}
-
-		return parent::requestUserInfo($attribute);
-	}
-
 	/**
 	 * @return mixed
 	 */
@@ -156,6 +125,22 @@ class Client extends OpenIDConnectClient {
 		$openIdConfig = $this->getOpenIdConfig();
 		if (isset($openIdConfig['use-access-token-payload-for-user-info']) && $openIdConfig['use-access-token-payload-for-user-info']) {
 			return $this->getAccessTokenPayload();
+		}
+
+		if (isset($openIdConfig['use-access-token-introspection-for-user-info']) && $openIdConfig['use-access-token-introspection-for-user-info']) {
+			$introspectionClientId = $config['token-introspection-endpoint-client-id'] ?? null;
+			$introspectionClientSecret = $config['token-introspection-endpoint-client-secret'] ?? null;
+			$accessToken = $this->getAccessToken();
+			if (isset($openIdConfig['exchange-token-mode-before-introspection'])) {
+				$mode = $openIdConfig['exchange-token-mode-before-introspection'];
+				$token = $mode === 'refresh-token' ? $this->getRefreshToken() : $this->getAccessToken();
+				$subjectTokenType = $mode === 'refresh-token' ? 'urn:ietf:params:oauth:token-type:refresh_token' : 'urn:ietf:params:oauth:token-type:access_token';
+				// Todo add debug logging, throw execpton in case error is returned
+				$response = $this->requestTokenExchange($token, $subjectTokenType, $this->getClientID());
+				$accessToken = $response->access_token;
+			}
+
+			return $this->introspectToken($accessToken, null, $introspectionClientId, $introspectionClientSecret);
 		}
 
 		return $this->requestUserInfo();
