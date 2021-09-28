@@ -29,6 +29,7 @@ use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\Logger;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\Response;
@@ -160,7 +161,9 @@ class LoginFlowController extends Controller {
 			} else {
 				$this->logger->debug('Id token holds no sid: ' . \json_encode($openid->getIdTokenPayload()));
 			}
+
 			$response = new RedirectResponse($this->getDefaultUrl());
+			$response->setStatus(Http::STATUS_FOUND);
 			$openIdConfig = $openid->getOpenIdConfig();
 			$cookieName = $openIdConfig['ocis-routing-policy-cookie'] ?? 'owncloud-selector';
 			$cookieDirectives = $openIdConfig['ocis-routing-policy-cookie-directives'] ?? 'path=/;';
