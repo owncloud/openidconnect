@@ -53,6 +53,17 @@ class LoginPageBehaviour {
 		if ($this->userSession->isLoggedIn()) {
 			return;
 		}
+		# only GET requests are of interest
+		if ($this->request->getMethod() !== 'GET') {
+			return;
+		}
+		# only requests on the login page are of interest
+		$components = \parse_url($this->request->getRequestUri());
+		/** @phan-suppress-next-line PhanTypePossiblyInvalidDimOffset */
+		$uri = $components['path'];
+		if (\substr($uri, -6) !== '/login') {
+			return;
+		}
 
 		// register alternative login
 		$loginName = $openIdConfig['loginButtonName'] ?? 'OpenID Connect';
@@ -63,15 +74,11 @@ class LoginPageBehaviour {
 		if (!$autoRedirectOnLoginPage) {
 			return;
 		}
-		$components = \parse_url($this->request->getRequestUri());
-		/** @phan-suppress-next-line PhanTypePossiblyInvalidDimOffset */
-		$uri = $components['path'];
-		if (\substr($uri, -6) === '/login') {
-			$req = $this->request->getRequestUri();
-			$this->logger->debug("Redirecting to IdP - request url: $req");
-			$loginUrl = $this->urlGenerator->linkToRoute('openidconnect.loginFlow.login', $this->request->getParams());
-			$this->redirect($loginUrl);
-		}
+
+		$req = $this->request->getRequestUri();
+		$this->logger->debug("Redirecting to IdP - request url: $req");
+		$loginUrl = $this->urlGenerator->linkToRoute('openidconnect.loginFlow.login', $this->request->getParams());
+		$this->redirect($loginUrl);
 	}
 
 	/**
