@@ -22,6 +22,7 @@
  */
 namespace OCA\OpenIdConnect\Service;
 
+use OCA\OpenIdConnect\Application;
 use OC\User\LoginException;
 use OCP\Http\Client\IClientService;
 use OCP\IAvatarManager;
@@ -146,6 +147,19 @@ class AutoProvisioningService {
 		return $user;
 	}
 	public function getOpenIdConfiguration(): array {
+		$configRaw = $this->config->getAppValue(Application::APPID, 'openid-connect', null);
+		if ($configRaw) {
+			$config = json_decode($configRaw, true);
+			if (json_last_error() !== JSON_ERROR_NONE) {
+				$this->logger->error(
+					'Loaded config from DB is not valid (malformed JSON); JSON Last Error: ' . json_last_error(),
+					['app' => Application::APPID]
+				);
+				return $this->config->getSystemValue('openid-connect', null) ?? [];
+			}
+			return $config;
+		}
+
 		return $this->config->getSystemValue('openid-connect', null) ?? [];
 	}
 
