@@ -22,10 +22,10 @@
  */
 namespace OCA\OpenIdConnect\Service;
 
+use OCA\OpenIdConnect\Client;
 use OC\User\LoginException;
 use OCP\Http\Client\IClientService;
 use OCP\IAvatarManager;
-use OCP\IConfig;
 use OCP\IGroupManager;
 use OCP\ILogger;
 use OCP\IUser;
@@ -50,13 +50,13 @@ class AutoProvisioningService {
 	 */
 	private $logger;
 	/**
-	 * @var IConfig
-	 */
-	private $config;
-	/**
 	 * @var IClientService
 	 */
 	private $clientService;
+	/**
+	 * @var Client
+	 */
+	private $client;
 
 	public function __construct(
 		IUserManager $userManager,
@@ -64,14 +64,14 @@ class AutoProvisioningService {
 		IAvatarManager $avatarManager,
 		IClientService $clientService,
 		ILogger $logger,
-		IConfig $config
+		Client $client
 	) {
 		$this->userManager = $userManager;
 		$this->groupManager = $groupManager;
 		$this->avatarManager = $avatarManager;
 		$this->logger = $logger;
-		$this->config = $config;
 		$this->clientService = $clientService;
+		$this->client = $client;
 	}
 
 	public function createUser($userInfo): IUser {
@@ -146,7 +146,7 @@ class AutoProvisioningService {
 		return $user;
 	}
 	public function getOpenIdConfiguration(): array {
-		return $this->config->getSystemValue('openid-connect', null) ?? [];
+		return $this->client->getOpenIdConfig();
 	}
 
 	public function enabled(): bool {
