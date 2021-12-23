@@ -23,13 +23,13 @@
 namespace OCA\OpenIdConnect\Tests\Unit\Service;
 
 use OC\User\LoginException;
+use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCP\Http\Client\IClient;
 use OCP\Http\Client\IClientService;
 use OCP\Http\Client\IResponse;
 use OCP\IAvatar;
 use OCP\IAvatarManager;
-use OCP\IConfig;
 use OCP\IGroup;
 use OCP\IGroupManager;
 use OCP\ILogger;
@@ -53,13 +53,9 @@ class AutoProvisioningServiceTest extends TestCase {
 	 */
 	private $avatarManager;
 	/**
-	 * @var ILogger|MockObject
+	 * @var Client|MockObject
 	 */
-	private $logger;
-	/**
-	 * @var IConfig|MockObject
-	 */
-	private $config;
+	private $client;
 	/**
 	 * @var AutoProvisioningService
 	 */
@@ -75,16 +71,16 @@ class AutoProvisioningServiceTest extends TestCase {
 		$this->groupManager = $this->createMock(IGroupManager::class);
 		$this->avatarManager = $this->createMock(IAvatarManager::class);
 		$this->clientService = $this->createMock(IClientService::class);
-		$this->logger = $this->createMock(ILogger::class);
-		$this->config = $this->createMock(IConfig::class);
+		$logger = $this->createMock(ILogger::class);
+		$this->client = $this->createMock(Client::class);
 
 		$this->autoProvisioningService = new AutoProvisioningService(
 			$this->userManager,
 			$this->groupManager,
 			$this->avatarManager,
 			$this->clientService,
-			$this->logger,
-			$this->config
+			$logger,
+			$this->client
 		);
 	}
 
@@ -94,7 +90,7 @@ class AutoProvisioningServiceTest extends TestCase {
 	 * @param array|null $config
 	 */
 	public function testEnabled(bool $expected, array $config = null): void {
-		$this->config->method('getSystemValue')->willReturn($config);
+		$this->client->method('getOpenIdConfig')->willReturn($config);
 		self::assertEquals($expected, $this->autoProvisioningService->enabled());
 	}
 
@@ -152,7 +148,7 @@ class AutoProvisioningServiceTest extends TestCase {
 		} else {
 			$this->expectException(LoginException::class);
 		}
-		$this->config->method('getSystemValue')->willReturn($config);
+		$this->client->method('getOpenIdConfig')->willReturn($config);
 		$this->autoProvisioningService->createUser($userInfo);
 	}
 

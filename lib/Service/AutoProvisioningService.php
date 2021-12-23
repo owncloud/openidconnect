@@ -100,8 +100,6 @@ class AutoProvisioningService {
 			}
 		}
 
-		$userId = $this->mode() === 'email' ? \uniqid('oidc-user-') : $emailOrUserId;
-		$passwd = \uniqid('', true);
 		$email = $this->mode() === 'email' ? $emailOrUserId : null;
 		$user = $this->userManager->createUser($userId, $this->generatePassword());
 		if (!$user) {
@@ -146,7 +144,7 @@ class AutoProvisioningService {
 		return $user;
 	}
 	public function getOpenIdConfiguration(): array {
-		return $this->client->getOpenIdConfig();
+		return $this->client->getOpenIdConfig() ?? [];
 	}
 
 	public function enabled(): bool {
@@ -161,16 +159,15 @@ class AutoProvisioningService {
 		return $this->getOpenIdConfiguration()['search-attribute'] ?? 'email';
 	}
 
-	protected function downloadPicture(string $pictureUrl) {
-		$response = $this->clientService->newClient()->get($pictureUrl);
-		return $response->getBody();
+	protected function downloadPicture(string $pictureUrl): string {
+		return $this->clientService->newClient()->get($pictureUrl)->getBody();
 	}
 
-	private function generateUserId() {
+	private function generateUserId(): string {
 		return 'oidc-user-'.\bin2hex(\random_bytes(16));
 	}
 
-	private function generatePassword() {
+	private function generatePassword(): string {
 		return \bin2hex(\random_bytes(32));
 	}
 }
