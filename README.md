@@ -171,6 +171,16 @@ To set it up locally do the following:
         frontchannel_logout_uri: 'http://localhost:8080/index.php/apps/openidconnect/logout'
       }
     ];
+    
+    // Enable introspection
+    module.exports.features: {
+       devInteractions: { enabled: false }, 
+       introspection: { enabled: true }, 
+       deviceFlow: { enabled: true }, 
+       revocation: { enabled: true }, 
+       issAuthResp: { enabled: true }, 
+    },
+    
     ```
 5. Start the IdP via: ```node standalone.js```
 6. Open in browser: http://localhost:3000/.well-known/openid-configuration
