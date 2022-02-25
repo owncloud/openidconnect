@@ -4,7 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased] - XXXX-XX-XX
+## [2.1.1] - 2022-02-25
+
+### Fixed
+
+- Public Link Uploads Fail for Anonymous Users - [#203](https://github.com/owncloud/openidconnect/pull/203)
+- Read openid configuration from DB first before using config.php - [#200](https://github.com/owncloud/openidconnect/pull/200)
+
+### Changed
+
+- Regular Maintenance (Library updates)
 
 
 
@@ -61,7 +70,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 - Initial Release
 
-[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.1.0...master
+[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.1.1...master
+[2.1.1]: https://github.com/owncloud/openidconnect/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/owncloud/openidconnect/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/owncloud/openidconnect/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/owncloud/openidconnect/compare/v0.2.0...v1.0.0
