@@ -59,7 +59,7 @@ class AccountUpdateServiceTest extends TestCase {
 	 */
 	public function testEnabled(bool $expected, array $config = null): void {
 		$this->client->method('getOpenIdConfig')->willReturn($config);
-		self::assertEquals($expected, $this->autoProvisioningService->enabled());
+		self::assertEquals($expected, $this->accountUpdateService->enabled());
 	}
 
 	public function providesConfig(): array {
