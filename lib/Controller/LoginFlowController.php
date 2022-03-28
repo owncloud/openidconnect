@@ -27,6 +27,7 @@ use OC\User\LoginException;
 use OC\User\Session;
 use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\Logger;
+use OCA\OpenIdConnect\Service\AccountUpdateService;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
@@ -65,6 +66,11 @@ class LoginFlowController extends Controller {
 	 * @var ICacheFactory
 	 */
 	private $memCacheFactory;
+	/**
+	 * @var AccountUpdateService
+	 */
+	private $accountUpdateService;
+
 
 	public function __construct(
 		string $appName,
@@ -74,7 +80,8 @@ class LoginFlowController extends Controller {
 		ISession $session,
 		ILogger $logger,
 		Client $client,
-		ICacheFactory $memCacheFactory
+		ICacheFactory $memCacheFactory,
+		AccountUpdateService $accountUpdateService
 	) {
 		parent::__construct($appName, $request);
 		if (!$userSession instanceof Session) {
@@ -87,6 +94,7 @@ class LoginFlowController extends Controller {
 		$this->client = $client;
 		$this->logger = new Logger($logger);
 		$this->memCacheFactory = $memCacheFactory;
+		$this->accountUpdateService = $accountUpdateService;
 	}
 
 	/**
@@ -141,6 +149,10 @@ class LoginFlowController extends Controller {
 			throw new LoginException('No user information available.');
 		}
 		$user = $this->userLookup->lookupUser($userInfo);
+
+		if ($this->accountUpdateService->enabled()) {
+			$this->accountUpdateService->updateAccountInfo($user, $userInfo);
+		}
 
 		// trigger login process
 		if ($this->userSession->createSessionToken($this->request, $user->getUID(), $user->getUID()) &&

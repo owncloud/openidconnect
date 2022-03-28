@@ -205,6 +205,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		}
 
 		$user = $this->lookupService->lookupUser($userInfo);
+
 		if ($this->accountUpdateService->enabled()) {
 			$this->accountUpdateService->updateAccountInfo($user, $userInfo);
 		}
