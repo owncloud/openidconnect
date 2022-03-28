@@ -82,11 +82,17 @@ class LoginFlowControllerLogoutTest extends TestCase {
 
 		$this->controller = new LoginFlowController(
 			'openidconnect',
-			$this->request, $this->userLookup, $this->userSession, $this->session, $this->logger, $this->client, $this->memCacheFactory
+			$this->request,
+			$this->userLookup,
+			$this->userSession,
+			$this->session,
+			$this->logger,
+			$this->client,
+			$this->memCacheFactory
 		);
 	}
 
-	public function testLogouNotConfigured(): void {
+	public function testLogoutNotConfigured(): void {
 		$this->logger->expects(self::once())->method('warning')->with('OpenID::logout: OpenID is not properly configured');
 
 		$this->controller->logout();

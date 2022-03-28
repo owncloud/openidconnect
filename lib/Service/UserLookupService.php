@@ -42,9 +42,11 @@ class UserLookupService {
 	 */
 	private $autoProvisioningService;
 
-	public function __construct(IUserManager $userManager,
-								Client $client,
-								AutoProvisioningService $autoProvisioningService) {
+	public function __construct(
+		IUserManager $userManager,
+		Client $client,
+		AutoProvisioningService $autoProvisioningService
+	) {
 		$this->userManager = $userManager;
 		$this->client = $client;
 		$this->autoProvisioningService = $autoProvisioningService;

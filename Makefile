@@ -3,14 +3,7 @@ SHELL := /bin/bash
 YARN := $(shell command -v yarn 2> /dev/null)
 NODE_PREFIX=$(shell pwd)
 COMPOSER_BIN := $(shell command -v composer 2> /dev/null)
-ifndef COMPOSER_BIN
-    $(error composer is not available on your system, please install composer)
-endif
-
 NPM := $(shell command -v npm 2> /dev/null)
-ifndef NPM
-    $(error npm is not available on your system, please install npm)
-endif
 
 # bin file definitions
 PHPUNIT=php -d zend.enable_gc=0  "$(PWD)/../../lib/composer/bin/phpunit"
@@ -116,12 +109,12 @@ test-php-unit-dbg: vendor/bin/phpunit
 .PHONY: test-php-style
 test-php-style: ## Run php-cs-fixer and check owncloud code-style
 test-php-style: vendor-bin/owncloud-codestyle/vendor
-	$(PHP_CS_FIXER) fix -v --diff --diff-format udiff --allow-risky yes --dry-run
+	$(PHP_CS_FIXER) fix -v --diff --allow-risky yes --dry-run
 
 .PHONY: test-php-style-fix
 test-php-style-fix: ## Run php-cs-fixer and fix code style issues
 test-php-style-fix: vendor-bin/owncloud-codestyle/vendor
-	$(PHP_CS_FIXER) fix -v --diff --diff-format udiff --allow-risky yes
+	$(PHP_CS_FIXER) fix -v --diff --allow-risky yes
 
 .PHONY: test-php-phan
 test-php-phan: ## Run phan

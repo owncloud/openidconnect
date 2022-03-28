@@ -10,13 +10,48 @@ A distributed memcache setup is required to properly operate this app - like Red
 For development purpose APCu is reasonable as well.
 Please follow the [documentation on how to set up caching](https://doc.owncloud.org/server/admin_manual/configuration/server/caching_configuration.html#supported-caching-backends).
 
-### Setup config.php
-The OpenId integration is established by entering the parameters below to the
-ownCloud configuration file.
+### Setup
+The OpenId integration is established by either entering the parameters below to the
+ownCloud configuration file or saving them to the app config database table.
+
 _provider-url_, _client-id_ and _client-secret- are to be taken from the OpenId
 Provider setup.
 _loginButtonName_ can be chosen freely depending on the installation.
 
+### Settings in database
+If you run a clustered setup, the following method is preferred because it is stateless. The OpenID Connect app checks for settings in the database first. If none is found, it falls back to the settings stored in `config.php`. If a malformed JSON string is found, an error is logged. You have to store your settings as a JSON formatted string in the ownCloud database table `oc_appconfig` with the following keys: 
+
+| Key           | Value            |
+| ------------- | -------------    |
+| appid         | 'openidconnect'  |
+| configkey     | 'openid-connect' |
+| configvalue   | _JSON-String_    |
+
+
+The _key->value_ pairs are the same as when storing them to the `config.php` file. The preferred method is using the occ command:
+```
+occ config:app:set openidconnect openid-connect \
+--value='{"provider-url":"https:\/\/idp.example.net","client-id":"fc9b5c78-ec73-47bf-befc-59d4fe780f6f","client-secret":"e3e5b04a-3c3c-4f4d-b16c-2a6e9fdd3cd1","loginButtonName":"Login via OpenId Connect"}'
+```
+
+This task can also be done by opening the database console for your ownCloud database and enter the following example command. Use the database commands `UPDATE` or `DELETE` to change or delete this keys (not recommended).
+
+```
+INSERT INTO oc_appconfig (
+  appid,
+  configkey,
+  configvalue
+) VALUES (
+  'openidconnect',
+  'openid-connect',
+  '{"provider-url":"https:\/\/idp.example.net","client-id":"fc9b5c78-ec73-47bf-befc-59d4fe780f6f","client-secret":"e3e5b04a-3c3c-4f4d-b16c-2a6e9fdd3cd1","loginButtonName":"Login via OpenId Connect"}'
+);
+```
+
+
+Note: The app checks for settings in the database first. If none is found it falls back to the config.php. If a malformed JSON string is found an error is thrown to the logger instance.
+
+### Settings in config.php
 ```php
 <?php
 $CONFIG = [
@@ -136,6 +171,16 @@ To set it up locally do the following:
         frontchannel_logout_uri: 'http://localhost:8080/index.php/apps/openidconnect/logout'
       }
     ];
+    
+    // Enable introspection
+    module.exports.features: {
+       devInteractions: { enabled: false }, 
+       introspection: { enabled: true }, 
+       deviceFlow: { enabled: true }, 
+       revocation: { enabled: true }, 
+       issAuthResp: { enabled: true }, 
+    },
+    
     ```
 5. Start the IdP via: ```node standalone.js```
 6. Open in browser: http://localhost:3000/.well-known/openid-configuration

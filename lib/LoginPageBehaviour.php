@@ -36,10 +36,12 @@ class LoginPageBehaviour {
 	/** @var IRequest */
 	private $request;
 
-	public function __construct(Logger $logger,
-								IUserSession $userSession,
-								IURLGenerator $urlGenerator,
-								IRequest $request) {
+	public function __construct(
+		Logger $logger,
+		IUserSession $userSession,
+		IURLGenerator $urlGenerator,
+		IRequest $request
+	) {
 		$this->logger = $logger;
 		$this->userSession = $userSession;
 		$this->urlGenerator = $urlGenerator;
@@ -49,6 +51,17 @@ class LoginPageBehaviour {
 	public function handleLoginPageBehaviour(array $openIdConfig): void {
 		// logged in? nothing to do
 		if ($this->userSession->isLoggedIn()) {
+			return;
+		}
+		# only GET requests are of interest
+		if ($this->request->getMethod() !== 'GET') {
+			return;
+		}
+		# only requests on the login page are of interest
+		$components = \parse_url($this->request->getRequestUri());
+		/** @phan-suppress-next-line PhanTypePossiblyInvalidDimOffset */
+		$uri = $components['path'];
+		if (\substr($uri, -6) !== '/login') {
 			return;
 		}
 
@@ -61,15 +74,11 @@ class LoginPageBehaviour {
 		if (!$autoRedirectOnLoginPage) {
 			return;
 		}
-		$components = \parse_url($this->request->getRequestUri());
-		/** @phan-suppress-next-line PhanTypePossiblyInvalidDimOffset */
-		$uri = $components['path'];
-		if (\substr($uri, -6) === '/login') {
-			$req = $this->request->getRequestUri();
-			$this->logger->debug("Redirecting to IdP - request url: $req");
-			$loginUrl = $this->urlGenerator->linkToRoute('openidconnect.loginFlow.login', $this->request->getParams());
-			$this->redirect($loginUrl);
-		}
+
+		$req = $this->request->getRequestUri();
+		$this->logger->debug("Redirecting to IdP - request url: $req");
+		$loginUrl = $this->urlGenerator->linkToRoute('openidconnect.loginFlow.login', $this->request->getParams());
+		$this->redirect($loginUrl);
 	}
 
 	/**

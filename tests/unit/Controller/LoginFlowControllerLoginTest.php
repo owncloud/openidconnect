@@ -22,7 +22,7 @@
 
 namespace OCA\OpenIdConnect\Tests\Unit\Controller;
 
-use Jumbojett\OpenIDConnectClientException;
+use JuliusPC\OpenIDConnectClientException;
 use OC\HintException;
 use OC\User\LoginException;
 use OC\User\Session;
@@ -86,7 +86,13 @@ class LoginFlowControllerLoginTest extends TestCase {
 
 		$this->controller = new LoginFlowController(
 			'openidconnect',
-			$this->request, $this->userLookup, $this->userSession, $this->session, $this->logger, $this->client, $this->memCacheFactory
+			$this->request,
+			$this->userLookup,
+			$this->userSession,
+			$this->session,
+			$this->logger,
+			$this->client,
+			$this->memCacheFactory
 		);
 	}
 
@@ -177,5 +183,30 @@ class LoginFlowControllerLoginTest extends TestCase {
 		$response = $this->controller->login();
 
 		self::assertEquals('http://localhost/index.php/apps/oauth2/foo/bla', $response->getRedirectURL());
+	}
+
+	public function testLoginCreateSuccessWithOCISRoutingPolicyCookie(): void {
+		$this->client->method('getOpenIdConfig')->willReturn([]);
+		$this->client->method('getUserInfo')->willReturn((object)['email' => 'foo@exmaple.net','ocis.routing.policy'=>'ocis']);
+		$this->client->method('getIdToken')->willReturn('id');
+		$this->client->method('getAccessToken')->willReturn('access');
+		$this->client->method('getRefreshToken')->willReturn('refresh');
+		$this->client->method('readRedirectUrl')->willReturn('index.php/apps/oauth2/foo/bla');
+		$user = $this->createMock(IUser::class);
+		$this->userLookup->method('lookupUser')->willReturn($user);
+		$this->userSession->method('createSessionToken')->willReturn(true);
+		$this->userSession->method('loginUser')->willReturn(true);
+		$this->session->expects(self::exactly(3))->method('set')->withConsecutive(
+			['oca.openid-connect.id-token', 'id'],
+			['oca.openid-connect.access-token', 'access'],
+			['oca.openid-connect.refresh-token', 'refresh']
+		);
+
+		$response = $this->controller->login();
+
+		self::assertEquals('http://localhost/index.php/apps/oauth2/foo/bla', $response->getRedirectURL());
+
+		$headers = $response->getHeaders();
+		self::assertEquals('owncloud-selector=ocis;path=/;', $headers['Set-Cookie']);
 	}
 }

@@ -33,10 +33,6 @@ use Test\TestCase;
 class LoginPageBehaviourTest extends TestCase {
 
 	/**
-	 * @var MockObject | Logger
-	 */
-	private $logger;
-	/**
 	 * @var MockObject | LoginPageBehaviour
 	 */
 	private $loginPageBehaviour;
@@ -55,14 +51,14 @@ class LoginPageBehaviourTest extends TestCase {
 
 	protected function setUp(): void {
 		parent::setUp();
-		$this->logger = $this->createMock(Logger::class);
+		$logger = $this->createMock(Logger::class);
 		$this->userSession = $this->createMock(IUserSession::class);
 		$this->urlGenerator = $this->createMock(IURLGenerator::class);
 		$this->request = $this->createMock(IRequest::class);
 
 		$this->loginPageBehaviour = $this->getMockBuilder(LoginPageBehaviour::class)
-			->setConstructorArgs([$this->logger, $this->userSession, $this->urlGenerator, $this->request])
-			->setMethods(['registerAlternativeLogin', 'redirect'])
+			->setConstructorArgs([$logger, $this->userSession, $this->urlGenerator, $this->request])
+			->onlyMethods(['registerAlternativeLogin', 'redirect'])
 			->getMock();
 	}
 
@@ -74,13 +70,15 @@ class LoginPageBehaviourTest extends TestCase {
 
 	public function testNotLoggedInNoAutoRedirect(): void {
 		$this->userSession->method('isLoggedIn')->willReturn(false);
-		$this->request->expects(self::never())->method('getRequestUri');
+		$this->request->expects(self::once())->method('getMethod')->willReturn('GET');
+		$this->request->method('getRequestUri')->willReturn('https://example.com/login');
 		$this->loginPageBehaviour->expects(self::once())->method('registerAlternativeLogin')->with('foo');
 		$this->loginPageBehaviour->handleLoginPageBehaviour(['loginButtonName' => 'foo']);
 	}
 
 	public function testNotLoggedInAutoRedirect(): void {
 		$this->userSession->method('isLoggedIn')->willReturn(false);
+		$this->request->method('getMethod')->willReturn('GET');
 		$this->request->method('getRequestUri')->willReturn('https://example.com/login');
 		$this->urlGenerator->method('linkToRoute')->willReturn('https://example.com/openid/redirect');
 		$this->loginPageBehaviour->expects(self::once())->method('registerAlternativeLogin')->with('OpenID Connect');
@@ -90,9 +88,20 @@ class LoginPageBehaviourTest extends TestCase {
 
 	public function testNotLoggedInAutoRedirectNoLoginPage(): void {
 		$this->userSession->method('isLoggedIn')->willReturn(false);
+		$this->request->method('getMethod')->willReturn('GET');
 		$this->request->method('getRequestUri')->willReturn('https://example.com/apps/files');
 		$this->urlGenerator->method('linkToRoute')->willReturn('https://example.com/openid/redirect');
-		$this->loginPageBehaviour->expects(self::once())->method('registerAlternativeLogin')->with('OpenID Connect');
+		$this->loginPageBehaviour->expects(self::never())->method('registerAlternativeLogin')->with('OpenID Connect');
+		$this->loginPageBehaviour->expects(self::never())->method('redirect')->with('https://example.com/openid/redirect');
+		$this->loginPageBehaviour->handleLoginPageBehaviour(['autoRedirectOnLoginPage' => true]);
+	}
+
+	public function testPUT(): void {
+		$this->userSession->method('isLoggedIn')->willReturn(false);
+		$this->request->method('getMethod')->willReturn('PUT');
+		$this->request->method('getRequestUri')->willReturn('https://example.com/apps/files');
+		$this->urlGenerator->method('linkToRoute')->willReturn('https://example.com/openid/redirect');
+		$this->loginPageBehaviour->expects(self::never())->method('registerAlternativeLogin')->with('OpenID Connect');
 		$this->loginPageBehaviour->expects(self::never())->method('redirect')->with('https://example.com/openid/redirect');
 		$this->loginPageBehaviour->handleLoginPageBehaviour(['autoRedirectOnLoginPage' => true]);
 	}

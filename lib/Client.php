@@ -21,11 +21,12 @@
  */
 namespace OCA\OpenIdConnect;
 
-use Jumbojett\OpenIDConnectClient;
-use Jumbojett\OpenIDConnectClientException;
+use JuliusPC\OpenIDConnectClient;
+use JuliusPC\OpenIDConnectClientException;
 use OCP\IConfig;
 use OCP\ISession;
 use OCP\IURLGenerator;
+use OCP\ILogger;
 
 class Client extends OpenIDConnectClient {
 
@@ -35,6 +36,9 @@ class Client extends OpenIDConnectClient {
 	private $config;
 	/** @var array */
 	private $wellKnownConfig;
+	/** @var ILogger */
+	private $logger;
+
 	/**
 	 * @var IURLGenerator
 	 */
@@ -46,14 +50,18 @@ class Client extends OpenIDConnectClient {
 	 * @param IConfig $config
 	 * @param IURLGenerator $generator
 	 * @param ISession $session
+	 * @param ILogger $logger
 	 */
-	public function __construct(IConfig $config,
-								IURLGenerator $generator,
-								ISession $session
+	public function __construct(
+		IConfig $config,
+		IURLGenerator $generator,
+		ISession $session,
+		ILogger $logger
 	) {
 		$this->session = $session;
 		$this->config = $config;
 		$this->generator = $generator;
+		$this->logger = $logger;
 
 		$openIdConfig = $this->getOpenIdConfig();
 		if ($openIdConfig === null) {
@@ -86,6 +94,19 @@ class Client extends OpenIDConnectClient {
 	 * @return mixed
 	 */
 	public function getOpenIdConfig() {
+		$configRaw = $this->config->getAppValue(Application::APPID, 'openid-connect', null);
+		if ($configRaw) {
+			$config = json_decode($configRaw, true);
+			if (json_last_error() !== JSON_ERROR_NONE) {
+				$this->logger->error(
+					'Loaded config from DB is not valid (malformed JSON); JSON Last Error: ' . json_last_error(),
+					['app' => Application::APPID]
+				);
+				return $this->config->getSystemValue('openid-connect', null);
+			}
+			return $config;
+		}
+
 		return $this->config->getSystemValue('openid-connect', null);
 	}
 
@@ -158,6 +179,13 @@ class Client extends OpenIDConnectClient {
 	protected function fetchURL($url, $post_body = null, $headers = []) {
 		// TODO: see how to use ownCloud HttpClient ....
 		return parent::fetchURL($url, $post_body, $headers);
+	}
+
+	/**
+	 * @codeCoverageIgnore
+	 */
+	public function getCodeChallengeMethod() {
+		return 'S256';
 	}
 
 	/**

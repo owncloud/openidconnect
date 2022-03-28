@@ -21,7 +21,7 @@
  */
 namespace OCA\OpenIdConnect;
 
-use Jumbojett\OpenIDConnectClientException;
+use JuliusPC\OpenIDConnectClientException;
 use OC\HintException;
 use OCP\ICache;
 use OCP\ICacheFactory;
@@ -43,12 +43,14 @@ class SessionVerifier {
 	/** @var IUserSession */
 	private $userSession;
 
-	public function __construct(Logger $logger,
-								ISession $session,
-								IUserSession $userSession,
-								ICacheFactory $cacheFactory,
-								EventDispatcherInterface $eventDispatcher,
-								Client $client) {
+	public function __construct(
+		Logger $logger,
+		ISession $session,
+		IUserSession $userSession,
+		ICacheFactory $cacheFactory,
+		EventDispatcherInterface $eventDispatcher,
+		Client $client
+	) {
 		$this->logger = $logger;
 		$this->session = $session;
 		$this->userSession = $userSession;

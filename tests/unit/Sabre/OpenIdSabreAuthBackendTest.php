@@ -22,7 +22,6 @@
 
 namespace OCA\OpenIdConnect\Tests\Unit\Sabre;
 
-use OC\HintException;
 use OC\User\LoginException;
 use OC\User\Session;
 use OCA\OpenIdConnect\OpenIdConnectAuthModule;
@@ -148,7 +147,7 @@ class OpenIdSabreAuthBackendTest extends TestCase {
 		$this->backend->expects(self::exactly(2))->method('setupFilesystem')->withConsecutive(
 			[''],
 			['alice']
-			);
+		);
 
 		$return = $this->backend->check($this->sabreRequest, $this->sabreResponse);
 		self::assertEquals([true, 'principals/users/alice'], $return);

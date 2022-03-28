@@ -21,7 +21,7 @@
  */
 namespace OCA\OpenIdConnect;
 
-use Jumbojett\OpenIDConnectClientException;
+use JuliusPC\OpenIDConnectClientException;
 use OC\User\LoginException;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\Authentication\IAuthModule;
@@ -61,11 +61,13 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	 * @param UserLookupService $lookupService
 	 * @param Client $client
 	 */
-	public function __construct(IUserManager $manager,
-								   ILogger $logger,
-								   ICacheFactory $cacheFactory,
-								   UserLookupService $lookupService,
-								   Client $client) {
+	public function __construct(
+		IUserManager $manager,
+		ILogger $logger,
+		ICacheFactory $cacheFactory,
+		UserLookupService $lookupService,
+		Client $client
+	) {
 		$this->manager = $manager;
 		$this->logger = new Logger($logger);
 		$this->cacheFactory = $cacheFactory;

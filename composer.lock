@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "565176544e66fd24dd9a2f8979d95dcb",
+    "content-hash": "3296d0acc53e32420e8c631d8f987d91",
     "packages": [
         {
-            "name": "jumbojett/openid-connect-php",
-            "version": "v0.9.2",
+            "name": "juliuspc/openid-connect-php",
+            "version": "v1.1.3",
             "source": {
                 "type": "git",
-                "url": "https://github.com/jumbojett/OpenID-Connect-PHP.git",
-                "reference": "4f95102af87f86c43e8191ec6e90d9f35ed1ce5f"
+                "url": "https://github.com/JuliusPC/OpenID-Connect-PHP.git",
+                "reference": "09e67c2f584cf6b64cbccd483a9df5364271ecdd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/jumbojett/OpenID-Connect-PHP/zipball/4f95102af87f86c43e8191ec6e90d9f35ed1ce5f",
-                "reference": "4f95102af87f86c43e8191ec6e90d9f35ed1ce5f",
+                "url": "https://api.github.com/repos/JuliusPC/OpenID-Connect-PHP/zipball/09e67c2f584cf6b64cbccd483a9df5364271ecdd",
+                "reference": "09e67c2f584cf6b64cbccd483a9df5364271ecdd",
                 "shasum": ""
             },
             "require": {
@@ -41,12 +41,23 @@
             "license": [
                 "Apache-2.0"
             ],
-            "description": "Bare-bones OpenID Connect client",
+            "description": "OpenID Connect client",
+            "keywords": [
+                "OpenID Connect",
+                "RFC7009",
+                "RFC7662",
+                "SSO",
+                "client",
+                "oauth 2",
+                "oidc",
+                "rfc6749",
+                "rfc7636"
+            ],
             "support": {
-                "issues": "https://github.com/jumbojett/OpenID-Connect-PHP/issues",
-                "source": "https://github.com/jumbojett/OpenID-Connect-PHP/tree/v0.9.2"
+                "issues": "https://github.com/JuliusPC/OpenID-Connect-PHP/issues",
+                "source": "https://github.com/JuliusPC/OpenID-Connect-PHP/tree/v1.1.3"
             },
-            "time": "2020-11-16T14:48:22+00:00"
+            "time": "2021-09-26T20:46:48+00:00"
         },
         {
             "name": "paragonie/random_compat",
@@ -100,16 +111,16 @@
         },
         {
             "name": "phpseclib/phpseclib",
-            "version": "2.0.31",
+            "version": "2.0.36",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpseclib/phpseclib.git",
-                "reference": "233a920cb38636a43b18d428f9a8db1f0a1a08f4"
+                "reference": "a97547126396548c224703a267a30af1592be146"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpseclib/phpseclib/zipball/233a920cb38636a43b18d428f9a8db1f0a1a08f4",
-                "reference": "233a920cb38636a43b18d428f9a8db1f0a1a08f4",
+                "url": "https://api.github.com/repos/phpseclib/phpseclib/zipball/a97547126396548c224703a267a30af1592be146",
+                "reference": "a97547126396548c224703a267a30af1592be146",
                 "shasum": ""
             },
             "require": {
@@ -189,7 +200,7 @@
             ],
             "support": {
                 "issues": "https://github.com/phpseclib/phpseclib/issues",
-                "source": "https://github.com/phpseclib/phpseclib/tree/2.0.31"
+                "source": "https://github.com/phpseclib/phpseclib/tree/2.0.36"
             },
             "funding": [
                 {
@@ -205,22 +216,22 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2021-04-06T13:56:45+00:00"
+            "time": "2022-01-30T08:48:36+00:00"
         }
     ],
     "packages-dev": [
         {
             "name": "bamarni/composer-bin-plugin",
-            "version": "1.4.1",
+            "version": "v1.5.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/bamarni/composer-bin-plugin.git",
-                "reference": "9329fb0fbe29e0e1b2db8f4639a193e4f5406225"
+                "reference": "49934ffea764864788334c1485fbb08a4b852031"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/bamarni/composer-bin-plugin/zipball/9329fb0fbe29e0e1b2db8f4639a193e4f5406225",
-                "reference": "9329fb0fbe29e0e1b2db8f4639a193e4f5406225",
+                "url": "https://api.github.com/repos/bamarni/composer-bin-plugin/zipball/49934ffea764864788334c1485fbb08a4b852031",
+                "reference": "49934ffea764864788334c1485fbb08a4b852031",
                 "shasum": ""
             },
             "require": {
@@ -255,9 +266,9 @@
             ],
             "support": {
                 "issues": "https://github.com/bamarni/composer-bin-plugin/issues",
-                "source": "https://github.com/bamarni/composer-bin-plugin/tree/master"
+                "source": "https://github.com/bamarni/composer-bin-plugin/tree/v1.5.0"
             },
-            "time": "2020-05-03T08:27:20+00:00"
+            "time": "2022-02-22T21:01:25+00:00"
         }
     ],
     "aliases": [],
@@ -266,11 +277,11 @@
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
-        "php": ">=7.1"
+        "php": ">=7.3"
     },
     "platform-dev": [],
     "platform-overrides": {
-        "php": "7.1"
+        "php": "7.3"
     },
-    "plugin-api-version": "2.0.0"
+    "plugin-api-version": "2.2.0"
 }

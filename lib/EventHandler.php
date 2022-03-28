@@ -40,10 +40,12 @@ class EventHandler {
 	/** @var ISession */
 	private $session;
 
-	public function __construct(EventDispatcherInterface $dispatcher,
-								IRequest $request,
-								IUserSession $userSession,
-								ISession $session) {
+	public function __construct(
+		EventDispatcherInterface $dispatcher,
+		IRequest $request,
+		IUserSession $userSession,
+		ISession $session
+	) {
 		$this->dispatcher = $dispatcher;
 		$this->request = $request;
 		$this->userSession = $userSession;
@@ -72,10 +74,12 @@ class EventHandler {
 	 */
 	protected function createAuthBackend(): OpenIdSabreAuthBackend {
 		$module = \OC::$server->query(OpenIdConnectAuthModule::class);
-		return new OpenIdSabreAuthBackend($this->session,
+		return new OpenIdSabreAuthBackend(
+			$this->session,
 			$this->userSession,
 			$this->request,
 			$module,
-			'principals/');
+			'principals/'
+		);
 	}
 }

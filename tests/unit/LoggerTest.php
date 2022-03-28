@@ -22,18 +22,8 @@
 
 namespace OCA\OpenIdConnect\Tests\Unit;
 
-use Jumbojett\OpenIDConnectClientException;
-use OC\HintException;
-use OC\Memcache\ArrayCache;
-use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\Logger;
-use OCA\OpenIdConnect\OpenIdConnectAuthModule;
-use OCA\OpenIdConnect\Service\UserLookupService;
-use OCP\ICacheFactory;
 use OCP\ILogger;
-use OCP\IRequest;
-use OCP\IUser;
-use OCP\IUserManager;
 use PHPUnit\Framework\MockObject\MockObject;
 use Test\TestCase;
 
@@ -48,7 +38,7 @@ class LoggerTest extends TestCase {
 	 */
 	private $logger;
 
-	public function providesMethods() {
+	public function providesMethods(): array {
 		return [
 			['alert'],
 			['critical'],
