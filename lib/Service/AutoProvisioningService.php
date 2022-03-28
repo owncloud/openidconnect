@@ -138,7 +138,6 @@ class AutoProvisioningService {
 		return $user;
 	}
 
-
 	public function enabled(): bool {
 		return $this->client->getOpenIdConfiguration()['auto-provision']['enabled'] ?? false;
 	}
