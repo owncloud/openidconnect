@@ -62,7 +62,8 @@ class AccountUpdateService {
 		}
 		$autoupdated = $this->autoupdatedAttributes();
 
-		if ((\in_array('email', $autoupdated) && $user->canChangeMailAddress()) || $force) {
+		if ($force || (\in_array('email', $autoupdated) &&
+				(!\method_exists('canChangeMailAddress') || $user->canChangeMailAddress()))) {
 			$currentEmail = $this->client->getUserEmail($userInfo);
 			if ($currentEmail && $currentEmail !== $user->getEMailAddress()) {
 				$this->logger->debug('AccountUpdateService: updating e-mail to ' . $currentEmail);
@@ -70,7 +71,7 @@ class AccountUpdateService {
 			}
 		}
 
-		if ((\in_array('display-name', $autoupdated) && $user->canChangeDisplayName()) || $force) {
+		if ($force || (\in_array('display-name', $autoupdated) && $user->canChangeDisplayName())) {
 			$currentDN = $this->client->getUserDisplayName($userInfo);
 			if ($currentDN && $currentDN !== $user->getDisplayName()) {
 				$this->logger->debug('AccountUpdateService: updating display name to ' . $currentDN);
