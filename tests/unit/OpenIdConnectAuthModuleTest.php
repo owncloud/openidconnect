@@ -27,6 +27,7 @@ use OC\Memcache\ArrayCache;
 use OC\User\LoginException;
 use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\OpenIdConnectAuthModule;
+use OCA\OpenIdConnect\Service\AccountUpdateService;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\ICacheFactory;
 use OCP\ILogger;
@@ -62,6 +63,10 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 	 * @var MockObject | Client
 	 */
 	private $client;
+	/**
+	 * @var MockObject | AccountUpdateService
+	 */
+	private $accountUpdateService;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -70,7 +75,15 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		$this->cacheFactory = $this->createMock(ICacheFactory::class);
 		$this->lookupService = $this->createMock(UserLookupService::class);
 		$this->client = $this->createMock(Client::class);
-		$this->authModule = new OpenIdConnectAuthModule($this->manager, $this->logger, $this->cacheFactory, $this->lookupService, $this->client);
+		$this->accountUpdateService = $this->createMock(AccountUpdateService::class);
+		$this->authModule = new OpenIdConnectAuthModule(
+			$this->manager,
+			$this->logger,
+			$this->cacheFactory,
+			$this->lookupService,
+			$this->client,
+			$this->accountUpdateService
+		);
 	}
 
 	public function testNoBearer(): void {
@@ -164,6 +177,22 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		$request = $this->createMock(IRequest::class);
 		$request->method('getHeader')->willReturn('Bearer 1234567890');
 
+		$this->authModule->auth($request);
+	}
+
+	public function testValidTokenWithAccountAutoupdate(): void {
+		$userInfo = (object)['email' => 'foo@example.com'];
+
+		$this->client->method('getOpenIdConfig')->willReturn(['auto-update' => [ 'enabled' => true ]]);
+		$this->client->method('getUserInfo')->willReturn($userInfo);
+		$this->cacheFactory->method('create')->willReturn(new ArrayCache());
+
+		$user = $this->createMock(IUser::class);
+		$this->lookupService->expects(self::once())->method('lookupUser')->willReturn($user);
+		$request = $this->createMock(IRequest::class);
+		$request->method('getHeader')->willReturn('Bearer 1234567890');
+
+		$this->accountUpdateService->expects(self::once())->method('updateAccountInfo')->with($user, $userInfo)->willReturn(null);
 		$this->authModule->auth($request);
 	}
 }

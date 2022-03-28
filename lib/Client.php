@@ -111,6 +111,13 @@ class Client extends OpenIDConnectClient {
 	}
 
 	/**
+	 * @return array
+	 */
+	public function getOpenIdConfiguration(): array {
+		return $this->getOpenIdConfig() ?? [];
+	}
+
+	/**
 	 * @throws OpenIDConnectClientException
 	 */
 	public function getWellKnownConfig() {
@@ -121,6 +128,10 @@ class Client extends OpenIDConnectClient {
 		return $this->wellKnownConfig;
 	}
 
+	public function mode() {
+		return $this->getOpenIdConfiguration()['mode'] ?? 'userid';
+	}
+
 	public function getUserInfo() {
 		$openIdConfig = $this->getOpenIdConfig();
 		if (isset($openIdConfig['use-access-token-payload-for-user-info']) && $openIdConfig['use-access-token-payload-for-user-info']) {
@@ -128,6 +139,54 @@ class Client extends OpenIDConnectClient {
 		}
 
 		return $this->requestUserInfo();
+	}
+
+	public function getIdentityClaim() {
+		return $this->getOpenIdConfiguration()['search-attribute'] ?? 'email';
+	}
+
+	public function getEmailClaim(): ?string {
+		$openIdConfig = $this->getOpenIdConfiguration();
+		return $openIdConfig['auto-provision']['email-claim'] ??
+			$openIdConfig['auto-update']['email-claim'] ??
+			null;
+	}
+
+	public function getDisplayNameClaim(): ?string {
+		$openIdConfig = $this->getOpenIdConfiguration();
+		return $openIdConfig['auto-provision']['display-name-claim'] ??
+			$openIdConfig['auto-update']['display-name-claim'] ??
+			null;
+	}
+
+	public function getPictureClaim(): ?string {
+		$openIdConfig = $this->getOpenIdConfiguration();
+		return $openIdConfig['auto-provision']['picture-claim'] ?? null;
+	}
+
+	public function getUserEmail($userInfo): ?string {
+		$email = $this->mode() === 'email' ? $userInfo->$this->getIdentityClaim() ?? null : null;
+		$emailClaim = $this->getEmailClaim();
+		if (!$email && $emailClaim) {
+			return $userInfo->$emailClaim;
+		}
+		return $email;
+	}
+
+	public function getUserDisplayName($userInfo): ?string {
+		$displayNameClaim = $this->getDisplayNameClaim();
+		if ($displayNameClaim) {
+			return $userInfo->$displayNameClaim;
+		}
+		return null;
+	}
+
+	public function getUserPicture($userInfo): ?string {
+		$pictureClaim = $this->getPictureClaim();
+		if ($pictureClaim) {
+			return $userInfo->$pictureClaim;
+		}
+		return null;
 	}
 
 	public function storeRedirectUrl(?string $redirectUrl): void {

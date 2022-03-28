@@ -23,6 +23,7 @@ namespace OCA\OpenIdConnect;
 
 use JuliusPC\OpenIDConnectClientException;
 use OC\User\LoginException;
+use OCA\OpenIdConnect\Service\AccountUpdateService;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\Authentication\IAuthModule;
 use OCP\ICache;
@@ -51,6 +52,8 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	private $client;
 	/** @var UserLookupService */
 	private $lookupService;
+	/** @var AccountUpdateService */
+	private $accountUpdateService;
 
 	/**
 	 * OpenIdConnectAuthModule constructor.
@@ -60,19 +63,22 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	 * @param ICacheFactory $cacheFactory
 	 * @param UserLookupService $lookupService
 	 * @param Client $client
+	 * @param AccountUpdateService $accountUpdateService
 	 */
 	public function __construct(
 		IUserManager $manager,
 		ILogger $logger,
 		ICacheFactory $cacheFactory,
 		UserLookupService $lookupService,
-		Client $client
+		Client $client,
+		AccountUpdateService $accountUpdateService
 	) {
 		$this->manager = $manager;
 		$this->logger = new Logger($logger);
 		$this->cacheFactory = $cacheFactory;
 		$this->client = $client;
 		$this->lookupService = $lookupService;
+		$this->autoUpdateService = $accountUpdateService;
 	}
 
 	/**
@@ -198,7 +204,12 @@ class OpenIdConnectAuthModule implements IAuthModule {
 			return null;
 		}
 
-		return $this->lookupService->lookupUser($userInfo);
+		$user = $this->lookupService->lookupUser($userInfo);
+		if (this->accountUpdateService->enabled()) {
+			$this->accountUpdateService->updateAccountInfo($user, $userInfo);
+		}
+
+		return $user;
 	}
 
 	private function updateCache(string $bearerToken, IUser $user, int $expiry): void {

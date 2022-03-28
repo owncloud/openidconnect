@@ -113,6 +113,30 @@ $CONFIG = [
 ];
 ```
 
+### Setup auto-update of user account info
+
+The auto-update mode will update user account with current information provided by the OpenID Connect provider
+upon new log in. Account attributes, that will be updated, can be specified in `attributes` config option.
+
+When auto-provision mode is also enabled, claims defined under the `auto-provision` config section are used
+to update the attributes. Otherwise, the claims need to be defined under the `auto-update` section.
+```php
+$CONFIG = [
+  'openid-connect' => [
+    'auto-update' => [
+      // enable the user info auto-update mode
+      'enabled' => true, 
+      // defines account attributes that will be auto-updated
+      'attributes' => ['email', 'display-name'],
+      // only relevant if auto-provision is disabled,  defines the claims used to update account info
+      'email-claim' => 'email', 
+      // defines the claim which holds the display name of the user
+      'display-name-claim' => 'given_name', 
+    ]
+  ]
+];
+```
+
 #### All Configuration Values explained
 
 - loginButtonName - the name as displayed on the login screen which is used to redirect to the IdP
