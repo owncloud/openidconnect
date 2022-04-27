@@ -82,26 +82,31 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	 */
 	public function auth(IRequest $request): ?IUser {
 		$authHeader = $request->getHeader('Authorization');
-		if (\strpos($authHeader, 'Bearer ') === false) {
-			return null;
+
+		if (stripos($authHeader, 'bearer ') === 0) {
+			$bearerToken = \substr($authHeader, 7);
+			return $this->authToken('Bearer', $bearerToken);
 		}
-		$bearerToken = \substr($authHeader, 7);
-		return $this->authToken($bearerToken);
+
+		if (stripos($authHeader, 'pop ') === 0) {
+			$bearerToken = \substr($authHeader, 4);
+			return $this->authToken('PoP', $bearerToken);
+		}
+
+		return null;
 	}
 
 	/**
-	 * @param string $bearerToken
-	 * @return IUser|null
 	 * @throws LoginException
 	 */
-	public function authToken(string $bearerToken): ?IUser {
-		$this->logger->debug('OpenIdConnectAuthModule::authToken ' . $bearerToken);
+	public function authToken(string $type, string $token): ?IUser {
+		$this->logger->debug("OpenIdConnectAuthModule::authToken $type $token");
 		try {
 			if ($this->client->getOpenIdConfig() === null) {
 				return null;
 			}
 			// 1. verify JWT signature
-			$expiry = $this->verifyJWT($bearerToken);
+			$expiry = $this->verifyJWT($type, $token);
 
 			// 2. verify expiry
 			if ($expiry) {
@@ -113,12 +118,12 @@ class OpenIdConnectAuthModule implements IAuthModule {
 			}
 
 			// 3. get user
-			$user = $this->getUserResource($bearerToken);
+			$user = $this->getUserResource($token);
 			if ($user) {
-				$this->updateCache($bearerToken, $user, $expiry);
+				$this->updateCache($token, $user, $expiry);
 				return $user;
 			}
-			$this->logger->debug('OpenIdConnectAuthModule::authToken : no user retrieved from token ' . $bearerToken);
+			$this->logger->debug('OpenIdConnectAuthModule::authToken : no user retrieved from token ' . $token);
 			return null;
 		} catch (OpenIDConnectClientException $ex) {
 			$this->logger->logException($ex);
@@ -136,22 +141,22 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	}
 
 	/**
-	 * @param string $bearerToken
 	 * @throws OpenIDConnectClientException
 	 */
-	private function verifyJWT($bearerToken) {
+	private function verifyJWT(string $type, string $token) {
 		$cache = $this->getCache();
-		$userInfo = $cache->get($bearerToken);
+		$userInfo = $cache->get($token);
 		if ($userInfo) {
 			return $userInfo['exp'];
 		}
+		# TODO: add PoP specific verification
 		$config = $this->client->getOpenIdConfig();
 		$useIntrospectionEndpoint = $config['use-token-introspection-endpoint'] ?? false;
 		if ($useIntrospectionEndpoint) {
 			$introspectionClientId = $config['token-introspection-endpoint-client-id'] ?? null;
 			$introspectionClientSecret = $config['token-introspection-endpoint-client-secret'] ?? null;
 
-			$introData = $this->client->introspectToken($bearerToken, '', $introspectionClientId, $introspectionClientSecret);
+			$introData = $this->client->introspectToken($token, '', $introspectionClientId, $introspectionClientSecret);
 			$this->logger->debug('Introspection info: ' . \json_encode($introData));
 			if (\property_exists($introData, 'error')) {
 				$this->logger->error('Token introspection failed: ' . \json_encode($introData));
@@ -163,11 +168,11 @@ class OpenIdConnectAuthModule implements IAuthModule {
 			}
 			return $introData->exp;
 		}
-		if (!$this->client->verifyJWTsignature($bearerToken)) {
-			$this->logger->error('Token cannot be verified: ' . $bearerToken);
+		if (!$this->client->verifyJWTsignature($token)) {
+			$this->logger->error('Token cannot be verified: ' . $token);
 			throw new OpenIDConnectClientException('Token cannot be verified.');
 		}
-		$this->client->setAccessToken($bearerToken);
+		$this->client->setAccessToken($token);
 		$payload = $this->client->getAccessTokenPayload();
 		$this->logger->debug('Access token payload: ' . \json_encode($payload));
 		/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
@@ -182,7 +187,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		return $this->cacheFactory->create('oca.openid-connect.2');
 	}
 
-	private function getUserResource($bearerToken) {
+	private function getUserResource($bearerToken): ?IUser {
 		$cache = $this->getCache();
 		$userInfo = $cache->get($bearerToken);
 		if ($userInfo) {

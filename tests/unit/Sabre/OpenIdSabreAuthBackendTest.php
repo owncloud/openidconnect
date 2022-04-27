@@ -90,10 +90,10 @@ class OpenIdSabreAuthBackendTest extends TestCase {
 		$this->userSession->method('getUser')->willReturn($user);
 		$this->session->method('get')->with(OpenIdSabreAuthBackend::DAV_AUTHENTICATED)->willReturn('alice');
 
-		$this->authModule->expects(self::once())->method('authToken')->with('1234567890')->willReturn(null);
+		$this->authModule->expects(self::once())->method('authToken')->with('Bearer', '1234567890')->willReturn(null);
 
 		$return = $this->backend->check($this->sabreRequest, $this->sabreResponse);
-		self::assertEquals([false, 'Bearer token was incorrect'], $return);
+		self::assertEquals([false, 'Bearer/PoP token was incorrect'], $return);
 	}
 
 	public function testLoggedInWithValidToken(): void {
@@ -103,7 +103,7 @@ class OpenIdSabreAuthBackendTest extends TestCase {
 		$this->userSession->method('getUser')->willReturn($user);
 		$this->session->method('get')->with(OpenIdSabreAuthBackend::DAV_AUTHENTICATED)->willReturn('alice');
 
-		$this->authModule->expects(self::once())->method('authToken')->with('1234567890')->willReturn($user);
+		$this->authModule->expects(self::once())->method('authToken')->with('Bearer', '1234567890')->willReturn($user);
 		$this->backend->expects(self::once())->method('setupFilesystem')->with('alice');
 
 		$return = $this->backend->check($this->sabreRequest, $this->sabreResponse);
@@ -120,7 +120,7 @@ class OpenIdSabreAuthBackendTest extends TestCase {
 		$this->userSession->expects(self::once())->method('tryAuthModuleLogin')->with($this->request)->willReturn(false);
 
 		$return = $this->backend->check($this->sabreRequest, $this->sabreResponse);
-		self::assertEquals([false, 'Bearer token was incorrect'], $return);
+		self::assertEquals([false, 'Bearer/PoP token was incorrect'], $return);
 	}
 
 	public function testNotLoggedInAndExceptionInLogin(): void {
@@ -133,7 +133,7 @@ class OpenIdSabreAuthBackendTest extends TestCase {
 		$this->userSession->expects(self::once())->method('tryAuthModuleLogin')->with($this->request)->willThrowException(new \Exception(':boom:'));
 
 		$return = $this->backend->check($this->sabreRequest, $this->sabreResponse);
-		self::assertEquals([false, 'Bearer token was incorrect'], $return);
+		self::assertEquals([false, 'Bearer/PoP token was incorrect'], $return);
 	}
 
 	public function testNotLoggedInWithValidToken(): void {
@@ -160,9 +160,9 @@ class OpenIdSabreAuthBackendTest extends TestCase {
 		$this->userSession->method('getUser')->willReturn($user);
 		$this->session->method('get')->with(OpenIdSabreAuthBackend::DAV_AUTHENTICATED)->willReturn('alice');
 
-		$this->authModule->expects(self::once())->method('authToken')->with('1234567890')->willThrowException(new LoginException(':zzz:'));
+		$this->authModule->expects(self::once())->method('authToken')->with('Bearer', '1234567890')->willThrowException(new LoginException(':zzz:'));
 
 		$return = $this->backend->check($this->sabreRequest, $this->sabreResponse);
-		self::assertEquals([false, 'Bearer token was incorrect'], $return);
+		self::assertEquals([false, 'Bearer/PoP token was incorrect'], $return);
 	}
 }

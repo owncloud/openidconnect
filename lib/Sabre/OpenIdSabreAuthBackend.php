@@ -27,9 +27,11 @@ use OCA\OpenIdConnect\OpenIdConnectAuthModule;
 use OCP\IRequest;
 use OCP\ISession;
 use OCP\IUserSession;
-use Sabre\DAV\Auth\Backend\AbstractBearer;
+use Sabre\DAV\Auth\Backend\BackendInterface;
+use Sabre\HTTP\RequestInterface;
+use Sabre\HTTP\ResponseInterface;
 
-class OpenIdSabreAuthBackend extends AbstractBearer {
+class OpenIdSabreAuthBackend implements BackendInterface {
 	public const DAV_AUTHENTICATED = Auth::DAV_AUTHENTICATED;
 
 	/**
@@ -77,10 +79,6 @@ class OpenIdSabreAuthBackend extends AbstractBearer {
 		$this->request = $request;
 		$this->authModule = $authModule;
 		$this->principalPrefix = $principalPrefix;
-
-		// setup realm
-		$defaults = new \OC_Defaults();
-		$this->realm = $defaults->getName();
 	}
 
 	/**
@@ -94,7 +92,7 @@ class OpenIdSabreAuthBackend extends AbstractBearer {
 	 * @param string $username The username.
 	 * @return bool True if the user initially authenticated via DAV, false otherwise.
 	 */
-	private function isDavAuthenticated($username) {
+	private function isDavAuthenticated(string $username): bool {
 		return $this->session->get(self::DAV_AUTHENTICATED) !== null &&
 			$this->session->get(self::DAV_AUTHENTICATED) === $username;
 	}
@@ -105,17 +103,17 @@ class OpenIdSabreAuthBackend extends AbstractBearer {
 	 * This method should return the full principal url, or false if the
 	 * token was incorrect.
 	 *
-	 * @param string $bearerToken The Bearer token.
+	 * @param string $token The Bearer token.
 	 * @return string|false The full principal url, if the token is valid, false otherwise.
 	 * @throws \OC\User\LoginException
 	 */
-	protected function validateBearerToken($bearerToken) {
+	protected function validateBearerToken($type, $token) {
 		if ($this->userSession->isLoggedIn() &&
 			$this->isDavAuthenticated($this->userSession->getUser()->getUID())) {
 			try {
 
 				// verify the bearer token
-				$tokenUser = $this->authModule->authToken($bearerToken);
+				$tokenUser = $this->authModule->authToken($type, $token);
 				if ($tokenUser === null) {
 					return false;
 				}
@@ -157,5 +155,47 @@ class OpenIdSabreAuthBackend extends AbstractBearer {
 	 */
 	protected function setupFilesystem(string $userId = ''): void {
 		\OC_Util::setupFS($userId);
+	}
+
+	public function check(RequestInterface $request, ResponseInterface $response) {
+		[$type, $token] = $this->getToken($request);
+
+		if (!$token) {
+			return [false, "No 'Authorization: Bearer' or 'Authorization: PoP' header found. Either the client didn't send one, or the server is mis-configured"];
+		}
+		$principalUrl = $this->validateBearerToken($type, $token);
+		if (!$principalUrl) {
+			return [false, 'Bearer/PoP token was incorrect'];
+		}
+
+		return [true, $principalUrl];
+	}
+
+	public function challenge(RequestInterface $request, ResponseInterface $response) {
+
+		// setup realm
+		$defaults = new \OC_Defaults();
+		$realm = $defaults->getName();
+
+		$response->addHeader('WWW-Authenticate', 'Bearer/PoP realm="'.$realm.'"');
+		$response->setStatus(401);
+	}
+
+	private function getToken(RequestInterface $request): array {
+		$auth = $request->getHeader('Authorization');
+
+		if (!$auth) {
+			return [null, null];
+		}
+
+		if (stripos($auth, 'bearer ') === 0) {
+			return ['Bearer', substr($auth, 7)];
+		}
+
+		if (stripos($auth, 'pop ') === 0) {
+			return ['Pop', substr($auth, 4)];
+		}
+
+		return [null, null];
 	}
 }
