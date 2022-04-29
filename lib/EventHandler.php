@@ -79,7 +79,7 @@ class EventHandler {
 			$this->userSession,
 			$this->request,
 			$module,
-			'principals/'
+			'principals/users/'
 		);
 	}
 }
