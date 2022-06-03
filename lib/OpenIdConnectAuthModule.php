@@ -1,8 +1,9 @@
 <?php
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
- *
- * @copyright Copyright (c) 2020, ownCloud GmbH
+ * @author Miroslav Bauer <Miroslav.Bauer@cesnet.cz>
+ * 
+ * @copyright Copyright (c) 2022, ownCloud GmbH
  * @license GPL-2.0
  *
  * This program is free software; you can redistribute it and/or
@@ -23,7 +24,7 @@ namespace OCA\OpenIdConnect;
 
 use JuliusPC\OpenIDConnectClientException;
 use OC\User\LoginException;
-use OCA\OpenIdConnect\Service\AccountUpdateService;
+use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\Authentication\IAuthModule;
 use OCP\ICache;
@@ -52,8 +53,8 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	private $client;
 	/** @var UserLookupService */
 	private $lookupService;
-	/** @var AccountUpdateService */
-	private $accountUpdateService;
+	/** @var AutoProvisioningService */
+	private $autoProvisioningService;
 
 	/**
 	 * OpenIdConnectAuthModule constructor.
@@ -63,7 +64,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	 * @param ICacheFactory $cacheFactory
 	 * @param UserLookupService $lookupService
 	 * @param Client $client
-	 * @param AccountUpdateService $accountUpdateService
+	 * @param AutoProvisioningService $autoProvisioningService
 	 */
 	public function __construct(
 		IUserManager $manager,
@@ -71,14 +72,14 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		ICacheFactory $cacheFactory,
 		UserLookupService $lookupService,
 		Client $client,
-		AccountUpdateService $accountUpdateService
+		AutoProvisioningService $autoProvisioningService
 	) {
 		$this->manager = $manager;
 		$this->logger = new Logger($logger);
 		$this->cacheFactory = $cacheFactory;
 		$this->client = $client;
 		$this->lookupService = $lookupService;
-		$this->autoUpdateService = $accountUpdateService;
+		$this->autoProvisioningService = $autoProvisioningService;
 	}
 
 	/**
@@ -203,11 +204,10 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		if ($userInfo === null) {
 			return null;
 		}
-
 		$user = $this->lookupService->lookupUser($userInfo);
 
-		if ($this->accountUpdateService->enabled()) {
-			$this->accountUpdateService->updateAccountInfo($user, $userInfo);
+		if ($this->autoProvisioningService->autoUpdateEnabled()) {
+			$this->autoProvisioningService->updateAccountInfo($user, $userInfo);
 		}
 
 		return $user;

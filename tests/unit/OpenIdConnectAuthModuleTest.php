@@ -1,8 +1,9 @@
 <?php
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
- *
- * @copyright Copyright (c) 2020, ownCloud GmbH
+ * @author Miroslav Bauer <Miroslav.Bauer@cesnet.cz>
+ * 
+ * @copyright Copyright (c) 2022, ownCloud GmbH
  * @license GPL-2.0
  *
  * This program is free software; you can redistribute it and/or
@@ -27,7 +28,7 @@ use OC\Memcache\ArrayCache;
 use OC\User\LoginException;
 use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\OpenIdConnectAuthModule;
-use OCA\OpenIdConnect\Service\AccountUpdateService;
+use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\ICacheFactory;
 use OCP\ILogger;
@@ -64,9 +65,9 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 	 */
 	private $client;
 	/**
-	 * @var MockObject | AccountUpdateService
+	 * @var MockObject | AutoProvisioningService
 	 */
-	private $accountUpdateService;
+	private $autoProvisioningService;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -75,14 +76,14 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		$this->cacheFactory = $this->createMock(ICacheFactory::class);
 		$this->lookupService = $this->createMock(UserLookupService::class);
 		$this->client = $this->createMock(Client::class);
-		$this->accountUpdateService = $this->createMock(AccountUpdateService::class);
+		$this->autoProvisioningService = $this->createMock(AutoProvisioningService::class);
 		$this->authModule = new OpenIdConnectAuthModule(
 			$this->manager,
 			$this->logger,
 			$this->cacheFactory,
 			$this->lookupService,
 			$this->client,
-			$this->accountUpdateService
+			$this->autoProvisioningService
 		);
 	}
 
@@ -180,10 +181,10 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		$this->authModule->auth($request);
 	}
 
-	public function testValidTokenWithAccountAutoupdate(): void {
+	public function testValidTokenWithAutoUpdate(): void {
 		$userInfo = (object)['email' => 'foo@example.com'];
 
-		$this->client->method('getOpenIdConfig')->willReturn(['auto-update' => [ 'enabled' => true ]]);
+		$this->client->method('getOpenIdConfig')->willReturn(['auto-provision' => [ 'update' => ['enabled' => true ]]]);
 		$this->client->method('getUserInfo')->willReturn($userInfo);
 		$this->cacheFactory->method('create')->willReturn(new ArrayCache());
 
@@ -192,7 +193,7 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		$request = $this->createMock(IRequest::class);
 		$request->method('getHeader')->willReturn('Bearer 1234567890');
 
-		$this->accountUpdateService->expects(self::once())->method('updateAccountInfo')->with($user, $userInfo)->willReturn(null);
+		$this->autoProvisioningService->expects(self::once())->method('updateAccountInfo')->with($user, $userInfo)->willReturn(null);
 		$this->authModule->auth($request);
 	}
 }

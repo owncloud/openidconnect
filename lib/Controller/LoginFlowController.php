@@ -1,8 +1,9 @@
 <?php
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
- *
- * @copyright Copyright (c) 2020, ownCloud GmbH
+ * @author Miroslav Bauer <Miroslav.Bauer@cesnet.cz>
+ * 
+ * @copyright Copyright (c) 2022, ownCloud GmbH
  * @license GPL-2.0
  *
  * This program is free software; you can redistribute it and/or
@@ -27,7 +28,7 @@ use OC\User\LoginException;
 use OC\User\Session;
 use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\Logger;
-use OCA\OpenIdConnect\Service\AccountUpdateService;
+use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
@@ -67,9 +68,9 @@ class LoginFlowController extends Controller {
 	 */
 	private $memCacheFactory;
 	/**
-	 * @var AccountUpdateService
+	 * @var AutoProvisioningService
 	 */
-	private $accountUpdateService;
+	private $autoProvisioningService;
 
 
 	public function __construct(
@@ -81,7 +82,7 @@ class LoginFlowController extends Controller {
 		ILogger $logger,
 		Client $client,
 		ICacheFactory $memCacheFactory,
-		AccountUpdateService $accountUpdateService
+		AutoProvisioningService $autoProvisioningService
 	) {
 		parent::__construct($appName, $request);
 		if (!$userSession instanceof Session) {
@@ -94,7 +95,7 @@ class LoginFlowController extends Controller {
 		$this->client = $client;
 		$this->logger = new Logger($logger);
 		$this->memCacheFactory = $memCacheFactory;
-		$this->accountUpdateService = $accountUpdateService;
+		$this->autoProvisioningService = $autoProvisioningService;
 	}
 
 	/**
@@ -150,8 +151,8 @@ class LoginFlowController extends Controller {
 		}
 		$user = $this->userLookup->lookupUser($userInfo);
 
-		if ($this->accountUpdateService->enabled()) {
-			$this->accountUpdateService->updateAccountInfo($user, $userInfo);
+		if ($this->autoProvisioningService->autoUpdateEnabled()) {
+			$this->autoProvisioningService->updateAccountInfo($user, $userInfo);
 		}
 
 		// trigger login process

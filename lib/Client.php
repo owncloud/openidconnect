@@ -1,8 +1,9 @@
 <?php
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
- *
- * @copyright Copyright (c) 2020, ownCloud GmbH
+ * @author Miroslav Bauer <Miroslav.Bauer@cesnet.cz>
+ * 
+ * @copyright Copyright (c) 2022, ownCloud GmbH
  * @license GPL-2.0
  *
  * This program is free software; you can redistribute it and/or
@@ -110,12 +111,11 @@ class Client extends OpenIDConnectClient {
 		return $this->config->getSystemValue('openid-connect', null);
 	}
 
-	/**
-	 * @return array
-	 */
-	public function getOpenIdConfiguration(): array {
-		return $this->getOpenIdConfig() ?? [];
+	public function getAutoUpdateConfig(): array {
+		$openIdConfig = $this->getOpenIdConfig();
+		return $openIdConfig['auto-provision']['update'];
 	}
+
 
 	/**
 	 * @throws OpenIDConnectClientException
@@ -129,7 +129,7 @@ class Client extends OpenIDConnectClient {
 	}
 
 	public function mode() {
-		return $this->getOpenIdConfiguration()['mode'] ?? 'userid';
+		return $this->getOpenIdConfig()['mode'] ?? 'userid';
 	}
 
 	public function getUserInfo() {
@@ -142,25 +142,21 @@ class Client extends OpenIDConnectClient {
 	}
 
 	public function getIdentityClaim() {
-		return $this->getOpenIdConfiguration()['search-attribute'] ?? 'email';
+		return $this->getOpenIdConfig()['search-attribute'] ?? 'email';
 	}
 
 	public function getEmailClaim(): ?string {
-		$openIdConfig = $this->getOpenIdConfiguration();
-		return $openIdConfig['auto-provision']['email-claim'] ??
-			$openIdConfig['auto-update']['email-claim'] ??
-			null;
+		$openIdConfig = $this->getOpenIdConfig();
+		return $openIdConfig['auto-provision']['email-claim'] ?? null;
 	}
 
 	public function getDisplayNameClaim(): ?string {
-		$openIdConfig = $this->getOpenIdConfiguration();
-		return $openIdConfig['auto-provision']['display-name-claim'] ??
-			$openIdConfig['auto-update']['display-name-claim'] ??
-			null;
+		$openIdConfig = $this->getOpenIdConfig();
+		return $openIdConfig['auto-provision']['display-name-claim'] ??	null;
 	}
 
 	public function getPictureClaim(): ?string {
-		$openIdConfig = $this->getOpenIdConfiguration();
+		$openIdConfig = $this->getOpenIdConfig();
 		return $openIdConfig['auto-provision']['picture-claim'] ?? null;
 	}
 

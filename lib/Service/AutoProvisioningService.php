@@ -2,8 +2,9 @@
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  * @author Ilja Neumann <ineumann@owncloud.com>
+ * @author Miroslav Bauer <Miroslav.Bauer@cesnet.cz>
  *
- * @copyright Copyright (c) 2020, ownCloud GmbH
+ * @copyright Copyright (c) 2022, ownCloud GmbH
  * @license GPL-2.0
  *
  * This program is free software; you can redistribute it and/or
@@ -57,10 +58,6 @@ class AutoProvisioningService {
 	 * @var Client
 	 */
 	private $client;
-	/**
-	 * @var AccountUpdateService
-	 */
-	private $accountUpdateService;
 
 	public function __construct(
 		IUserManager $userManager,
@@ -68,8 +65,7 @@ class AutoProvisioningService {
 		IAvatarManager $avatarManager,
 		IClientService $clientService,
 		ILogger $logger,
-		Client $client,
-		AccountUpdateService $accountUpdateService
+		Client $client
 	) {
 		$this->userManager = $userManager;
 		$this->groupManager = $groupManager;
@@ -77,7 +73,6 @@ class AutoProvisioningService {
 		$this->logger = $logger;
 		$this->clientService = $clientService;
 		$this->client = $client;
-		$this->accountUpdateService = $accountUpdateService;
 	}
 
 	public function createUser($userInfo): IUser {
@@ -91,7 +86,7 @@ class AutoProvisioningService {
 		}
 		$userId = $this->client->mode() === 'email' ? $this->generateUserId() : $emailOrUserId;
 
-		$openIdConfig = $this->client->getOpenIdConfiguration();
+		$openIdConfig = $this->client->getOpenIdConfig();
 		$provisioningClaim = $openIdConfig['auto-provision']['provisioning-claim'] ?? null;
 		if ($provisioningClaim) {
 			$this->logger->debug('ProvisioningClaim is defined for auto-provision', ['claim' => $provisioningClaim]);
@@ -120,7 +115,7 @@ class AutoProvisioningService {
 			}
 		}
 
-		$this->accountUpdateService->updateAccountInfo($user, $userInfo, true);
+		$this->updateAccountInfo($user, $userInfo, true);
 
 		$pictureUrl = $this->client->getUserPicture($userInfo);
 		if ($pictureUrl) {
@@ -138,8 +133,35 @@ class AutoProvisioningService {
 		return $user;
 	}
 
+	public function updateAccountInfo(IUser $user, $userInfo, bool $force = false) {
+		if (!($this->autoUpdateEnabled() || $force)) {
+			throw new LoginException('Account auto-update is disabled.');
+		}
+		$attributes = $this->client->getAutoUpdateConfig()['attributes'] ?? ['email', 'display-name'];
+
+		if ($force || (\in_array('email', $attributes) && $user->canChangeMailAddress())) {
+			$currentEmail = $this->client->getUserEmail($userInfo);
+			if ($currentEmail && $currentEmail !== $user->getEMailAddress()) {
+				$this->logger->debug('AutoProvisioningService: setting e-mail to ' . $currentEmail);
+				$user->setEMailAddress($currentEmail);
+			}
+		}
+
+		if ($force || (\in_array('display-name', $attributes) && $user->canChangeDisplayName())) {
+			$currentDN = $this->client->getUserDisplayName($userInfo);
+			if ($currentDN && $currentDN !== $user->getDisplayName()) {
+				$this->logger->debug('AutoProvisioningService: setting display name to ' . $currentDN);
+				$user->setDisplayName($currentDN);
+			}
+		}
+	}
+	
 	public function enabled(): bool {
-		return $this->client->getOpenIdConfiguration()['auto-provision']['enabled'] ?? false;
+		return \boolval($this->client->getOpenIdConfig()['auto-provision']['enabled'] ?? false);
+	}
+
+	public function autoUpdateEnabled(): bool {
+		return \boolval($this->client->getAutoUpdateConfig()['enabled'] ?? false);
 	}
 
 	protected function downloadPicture(string $pictureUrl): string {

@@ -1,7 +1,7 @@
 <?php
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
- *
+ * 
  * @copyright Copyright (c) 2020, ownCloud GmbH
  * @license GPL-2.0
  *
@@ -26,6 +26,7 @@ use OC\Memcache\ArrayCache;
 use OC\User\Session;
 use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\Controller\LoginFlowController;
+use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\ICacheFactory;
 use OCP\ILogger;
@@ -69,6 +70,9 @@ class LoginFlowControllerLogoutTest extends TestCase {
 	 * @var MockObject | ICacheFactory
 	 */
 	private $memCacheFactory;
+	/**
+	 * @var MockObject | AutoProvisioningService
+	 */
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -79,6 +83,7 @@ class LoginFlowControllerLogoutTest extends TestCase {
 		$this->logger = $this->createMock(ILogger::class);
 		$this->client = $this->createMock(Client::class);
 		$this->memCacheFactory = $this->createMock(ICacheFactory::class);
+		$this->autoProvisioningService = $this->createMock(AutoProvisioningService::class);
 
 		$this->controller = new LoginFlowController(
 			'openidconnect',
@@ -88,7 +93,8 @@ class LoginFlowControllerLogoutTest extends TestCase {
 			$this->session,
 			$this->logger,
 			$this->client,
-			$this->memCacheFactory
+			$this->memCacheFactory,
+			$this->autoProvisioningService
 		);
 	}
 
