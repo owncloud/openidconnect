@@ -146,7 +146,7 @@ a redirect on the web server to point .well-known/openid-configuration to /index
 
 This is an .htaccess example
 ```
-  RewriteRule ^\.well-known/openid-configuration /index.php/apps/openidconnect/config [P]
+  RewriteRule ^\.well-known/openid-configuration /index.php/apps/openidconnect/config [R=301,L]
 ```
 
 The Apache modules proxy and proxy_http need to be enabled. (Debian/Ubuntu: a2enmod proxy proxy_http)
