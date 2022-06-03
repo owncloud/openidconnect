@@ -19,7 +19,7 @@ ownCloud configuration file or saving them to the app config database table.
 
 _provider-url_, _client-id_ and _client-secret- are to be taken from the OpenId
 Provider setup.
-\_loginButtonName_ can be chosen freely depending on the installation.
+_loginButtonName_ can be chosen freely depending on the installation.
 
 ### Settings in database
 
@@ -237,8 +237,8 @@ To set it up locally do the following:
 8. Clients can now use <http://localhost:3000/.well-known/openid-configuration> to obtain all information which is necessary
    to initiate the OpenId Connect flow. Use the granted access token in any request to ownCloud within a bearer authentication header.
 9. You can login with any credentials but you need to make sure that the user with the given user id exists. In a real world deployment the users will come from LDAP.
-   Keep in mind that by default, oidc app will search for the `email` attribute - which is hardcoded to `johndoe@example.com` [ref](https://github.com/panva/node-oidc-provider/blob/master/example/support/account.js#L32)
-   If you wish to map the login name on the oidc-provider with owncloud user ids, you can configure it as following:
+-  Keep in mind that by default, oidc app will search for the `email` attribute - which is hardcoded to `johndoe@example.com` [ref](https://github.com/panva/node-oidc-provider/blob/master/example/support/account.js#L32)
+-  If you wish to map the login name on the oidc-provider with owncloud user ids, you can configure it as following:
 
 ```
     $CONFIG = [
