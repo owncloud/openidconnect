@@ -76,7 +76,7 @@ class AutoProvisioningService {
 	}
 
 	public function createUser($userInfo): IUser {
-		if (!$this->enabled()) {
+		if (!$this->autoProvisioningEnabled()) {
 			throw new LoginException('Auto provisioning is disabled.');
 		}
 		$attribute = $this->client->getIdentityClaim();
@@ -86,11 +86,11 @@ class AutoProvisioningService {
 		}
 		$userId = $this->client->mode() === 'email' ? $this->generateUserId() : $emailOrUserId;
 
-		$openIdConfig = $this->client->getOpenIdConfig();
-		$provisioningClaim = $openIdConfig['auto-provision']['provisioning-claim'] ?? null;
+		$config = $this->client->getAutoProvisionConfig();
+		$provisioningClaim = $config['provisioning-claim'] ?? null;
 		if ($provisioningClaim) {
 			$this->logger->debug('ProvisioningClaim is defined for auto-provision', ['claim' => $provisioningClaim]);
-			$provisioningAttribute = $openIdConfig['auto-provision']['provisioning-attribute'] ?? null;
+			$provisioningAttribute = $config['provisioning-attribute'] ?? null;
 
 			if (!\property_exists($userInfo, $provisioningClaim) || !\is_array($userInfo->$provisioningClaim)) {
 				throw new LoginException('Required provisioning attribute is not found.');
@@ -107,7 +107,7 @@ class AutoProvisioningService {
 		}
 		$user->setEnabled(true);
 
-		$groups = $openIdConfig['auto-provision']['groups'] ?? [];
+		$groups = $config['groups'] ?? [];
 		foreach ($groups as $group) {
 			$g = $this->groupManager->get($group);
 			if ($g) {
@@ -138,7 +138,6 @@ class AutoProvisioningService {
 			throw new LoginException('Account auto-update is disabled.');
 		}
 		$attributes = $this->client->getAutoUpdateConfig()['attributes'] ?? ['email', 'display-name'];
-
 		if ($force || (\in_array('email', $attributes) && $user->canChangeMailAddress())) {
 			$currentEmail = $this->client->getUserEmail($userInfo);
 			if ($currentEmail && $currentEmail !== $user->getEMailAddress()) {
@@ -156,8 +155,8 @@ class AutoProvisioningService {
 		}
 	}
 	
-	public function enabled(): bool {
-		return \boolval($this->client->getOpenIdConfig()['auto-provision']['enabled'] ?? false);
+	public function autoProvisioningEnabled(): bool {
+		return \boolval($this->client->getAutoProvisionConfig()['enabled'] ?? false);
 	}
 
 	public function autoUpdateEnabled(): bool {

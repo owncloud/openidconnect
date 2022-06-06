@@ -75,7 +75,7 @@ class UserLookupService {
 		if ($searchByEmail) {
 			$user = $this->userManager->getByEmail($userInfo->$attribute);
 			if (!$user) {
-				if ($this->autoProvisioningService->enabled()) {
+				if ($this->autoProvisioningService->autoProvisioningEnabled()) {
 					return $this->autoProvisioningService->createUser($userInfo);
 				}
 
@@ -89,7 +89,7 @@ class UserLookupService {
 		}
 		$user = $this->userManager->get($userInfo->$attribute);
 		if (!$user) {
-			if ($this->autoProvisioningService->enabled()) {
+			if ($this->autoProvisioningService->autoProvisioningEnabled()) {
 				return $this->autoProvisioningService->createUser($userInfo);
 			}
 			throw new LoginException("User {$userInfo->$attribute} is not known.");

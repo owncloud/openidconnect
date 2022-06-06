@@ -111,9 +111,12 @@ class Client extends OpenIDConnectClient {
 		return $this->config->getSystemValue('openid-connect', null);
 	}
 
+	public function getAutoProvisionConfig(): array {
+		return $this->getOpenIdConfig()['auto-provision'];
+	}
+
 	public function getAutoUpdateConfig(): array {
-		$openIdConfig = $this->getOpenIdConfig();
-		return $openIdConfig['auto-provision']['update'];
+		return $this->getAutoProvisionConfig()['update'];
 	}
 
 
@@ -146,22 +149,19 @@ class Client extends OpenIDConnectClient {
 	}
 
 	public function getEmailClaim(): ?string {
-		$openIdConfig = $this->getOpenIdConfig();
-		return $openIdConfig['auto-provision']['email-claim'] ?? null;
+		return $this->getAutoProvisionConfig()['email-claim'] ?? null;
 	}
 
 	public function getDisplayNameClaim(): ?string {
-		$openIdConfig = $this->getOpenIdConfig();
-		return $openIdConfig['auto-provision']['display-name-claim'] ??	null;
+		return $this->getAutoProvisionConfig()['display-name-claim'] ??	null;
 	}
 
 	public function getPictureClaim(): ?string {
-		$openIdConfig = $this->getOpenIdConfig();
-		return $openIdConfig['auto-provision']['picture-claim'] ?? null;
+		return $this->getAutoProvisionConfig()['picture-claim'] ?? null;
 	}
 
 	public function getUserEmail($userInfo): ?string {
-		$email = $this->mode() === 'email' ? $userInfo->$this->getIdentityClaim() ?? null : null;
+		$email = $this->mode() === 'email' ? $userInfo->{$this->getIdentityClaim()} : null;
 		$emailClaim = $this->getEmailClaim();
 		if (!$email && $emailClaim) {
 			return $userInfo->$emailClaim;

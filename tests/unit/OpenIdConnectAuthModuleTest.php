@@ -183,16 +183,19 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 
 	public function testValidTokenWithAutoUpdate(): void {
 		$userInfo = (object)['email' => 'foo@example.com'];
-
-		$this->client->method('getOpenIdConfig')->willReturn(['auto-provision' => [ 'update' => ['enabled' => true ]]]);
+		$openIdConfig = ['auto-provision' => [ 'update' => ['enabled' => true ]]];
+		$this->client->method('getOpenIdConfig')->willReturn($openIdConfig);
+		$this->client->method('getAutoProvisionConfig')->willReturn($openIdConfig['auto-provision']);
 		$this->client->method('getUserInfo')->willReturn($userInfo);
+		$this->client->method('verifyJWTsignature')->willReturn(true);
+		$this->client->method('getAccessTokenPayload')->willReturn((object)['exp' => time() + 100]);
+		$this->autoProvisioningService->method('autoUpdateEnabled')->willReturn(true);
 		$this->cacheFactory->method('create')->willReturn(new ArrayCache());
 
 		$user = $this->createMock(IUser::class);
 		$this->lookupService->expects(self::once())->method('lookupUser')->willReturn($user);
 		$request = $this->createMock(IRequest::class);
 		$request->method('getHeader')->willReturn('Bearer 1234567890');
-
 		$this->autoProvisioningService->expects(self::once())->method('updateAccountInfo')->with($user, $userInfo)->willReturn(null);
 		$this->authModule->auth($request);
 	}

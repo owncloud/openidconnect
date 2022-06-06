@@ -84,6 +84,8 @@ class UserLookupServiceTest extends TestCase {
 
 	public function testLookupByEMail(): void {
 		$this->client->method('getOpenIdConfig')->willReturn([]);
+		$this->client->method('mode')->willReturn('email');
+		$this->client->method('getIdentityClaim')->willReturn('email');
 		$user = $this->createMock(IUser::class);
 		$this->manager->method('getByEmail')->willReturn([$user]);
 		$return = $this->userLookup->lookupUser((object)['email' => 'foo@example.com']);
@@ -94,11 +96,15 @@ class UserLookupServiceTest extends TestCase {
 		$this->expectException(LoginException::class);
 		$this->expectExceptionMessage('User alice is not known.');
 		$this->client->method('getOpenIdConfig')->willReturn(['mode' => 'userid', 'search-attribute' => 'preferred_username']);
+		$this->client->method('getIdentityClaim')->willReturn('preferred_username');
+		$this->client->method('mode')->willReturn('userid');
 		$this->userLookup->lookupUser((object)['preferred_username' => 'alice']);
 	}
 
 	public function testLookupByUserId(): void {
 		$this->client->method('getOpenIdConfig')->willReturn(['mode' => 'userid', 'search-attribute' => 'preferred_username']);
+		$this->client->method('mode')->willReturn('userid');
+		$this->client->method('getIdentityClaim')->willReturn('preferred_username');
 		$user = $this->createMock(IUser::class);
 		$this->manager->method('get')->willReturn($user);
 		$return = $this->userLookup->lookupUser((object)['preferred_username' => 'alice']);
@@ -107,6 +113,8 @@ class UserLookupServiceTest extends TestCase {
 
 	public function testInvalidUserBackEnd(): void {
 		$this->client->method('getOpenIdConfig')->willReturn(['mode' => 'userid', 'search-attribute' => 'preferred_username', 'allowed-user-backends' => ['LDAP']]);
+		$this->client->method('getIdentityClaim')->willReturn('preferred_username');
+		$this->client->method('mode')->willReturn('userid');
 		$user = $this->createMock(IUser::class);
 		$user->method('getBackendClassName')->willReturn('Database');
 		$this->manager->method('get')->willReturn($user);
@@ -116,7 +124,9 @@ class UserLookupServiceTest extends TestCase {
 	}
 
 	public function testValidUserBackEnd(): void {
-		$this->client->method('getOpenIdConfig')->willReturn(['mode' => 'userid', 'search-attribute' => 'preferred_username', 'allowed-user-backends' => ['LDAP']]);
+		$this->client->method('getOpenIdConfig')->willReturn(['allowed-user-backends' => ['LDAP']]);
+		$this->client->method('getIdentityClaim')->willReturn('preferred_username');
+		$this->client->method('mode')->willReturn('userid');
 		$user = $this->createMock(IUser::class);
 		$user->method('getBackendClassName')->willReturn('LDAP');
 		$this->manager->method('get')->willReturn($user);

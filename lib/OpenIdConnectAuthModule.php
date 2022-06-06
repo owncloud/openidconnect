@@ -198,7 +198,6 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		}
 
 		$this->client->setAccessToken($bearerToken);
-
 		$userInfo = $this->client->getUserInfo();
 		$this->logger->debug('OpenIdConnectAuthModule::getUserResource from cache: ' . \json_encode($userInfo));
 		if ($userInfo === null) {

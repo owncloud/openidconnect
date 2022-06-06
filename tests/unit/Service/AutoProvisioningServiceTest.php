@@ -90,9 +90,9 @@ class AutoProvisioningServiceTest extends TestCase {
 	 * @param bool $expected
 	 * @param array|null $config
 	 */
-	public function testEnabled(bool $expected, array $config = null): void {
-		$this->client->method('getOpenIdConfig')->willReturn($config);
-		self::assertEquals($expected, $this->autoProvisioningService->enabled());
+	public function testAutoProvisionEnabled(bool $expected, array $config = null): void {
+		$this->client->method('getAutoProvisionConfig')->willReturn($config['auto-provision'] ?? []);
+		self::assertEquals($expected, $this->autoProvisioningService->autoProvisioningEnabled());
 	}
 
 	public function providesConfig(): array {
@@ -125,6 +125,23 @@ class AutoProvisioningServiceTest extends TestCase {
 		array $config,
 		object $userInfo
 	): void {
+		$this->client->method('getOpenIdConfig')->willReturn($config);
+		$this->client->method('getAutoProvisionConfig')->willReturn($config['auto-provision'] ?? []);
+		$this->client->method('getAutoUpdateConfig')->willReturn($config['auto-provision']['update'] ?? []);
+
+		$idClaim = $config['search-attribute'] ?? 'email';
+		$emailClaim = $this->client->getAutoProvisionConfig()['email-claim'] ?? null;
+		$dnClaim = $this->client->getAutoProvisionConfig()['display-name-claim'] ?? null;
+		$pictureClaim = $this->client->getAutoProvisionConfig()['picture-claim'] ?? null;
+
+		$this->client->method('getIdentityClaim')->willReturn($idClaim);
+		$this->client->method('mode')->willReturn($config['mode'] ?? 'userid');
+		$this->client->method('getUserEmail')->willReturn($this->client->mode() === 'email'
+			? ($idClaim ? $userInfo->{$idClaim} : '')
+			: ($emailClaim ? $userInfo->{$emailClaim} : ''));
+		$this->client->method('getUserDisplayName')->willReturn($dnClaim ? $userInfo->{$dnClaim} : '');
+		$this->client->method('getUserPicture')->willReturn($pictureClaim ? $userInfo->{$pictureClaim} : null);
+
 		if ($expectsUserToBeCreated) {
 			$user = $this->createMock(IUser::class);
 			$user->expects($expectEmailToBeSet ? self::once() : self::never())->method('setEMailAddress');
@@ -149,7 +166,6 @@ class AutoProvisioningServiceTest extends TestCase {
 		} else {
 			$this->expectException(LoginException::class);
 		}
-		$this->client->method('getOpenIdConfig')->willReturn($config);
 		$this->autoProvisioningService->createUser($userInfo);
 	}
 
@@ -159,7 +175,9 @@ class AutoProvisioningServiceTest extends TestCase {
 	 * @param array|null $config
 	 */
 	public function testAutoUpdateEnabled(bool $expected, array $config = null): void {
-		$this->client->method('getOpenIdConfig')->willReturn($config);
+		$this->client->method('getAutoProvisionConfig')->willReturn($config['auto-provision'] ?? []);
+		$this->client->method('getAutoUpdateConfig')->willReturn($config['auto-provision']['update'] ?? []);
+		$this->client->method('getIdentityClaim')->willReturn($config['search-attribute'] ?? 'email');
 		self::assertEquals($expected, $this->autoProvisioningService->autoUpdateEnabled());
 	}
 
@@ -170,7 +188,7 @@ class AutoProvisioningServiceTest extends TestCase {
 			[false, ['auto-provision' => []]],
 			[false, ['auto-provision' => ['update' => []]]],
 			[false, ['auto-provision' => ['update' => ['enabled' => false]]]],
-			[false, ['auto-provision' => ['update' => ['enabled' => true]]]],
+			[true, ['auto-provision' => ['update' => ['enabled' => true]]]],
 		];
 	}
 
@@ -201,7 +219,18 @@ class AutoProvisioningServiceTest extends TestCase {
 		array $userInfo
 	): void {
 		$user = $this->createMock(IUser::class);
-		$this->client->method('getOpenIdConfig')->willReturn($config);
+		$idClaim = $config['search-attribute'] ?? 'email';
+		$emailClaim = $this->client->getAutoProvisionConfig()['email-claim'] ?? null;
+		$dnClaim = $this->client->getAutoProvisionConfig()['display-name-claim'] ?? null;
+
+		$this->client->method('getAutoProvisionConfig')->willReturn($this->client->getOpenIdConfig()['auto-provision'] ?? []);
+		$this->client->method('getAutoUpdateConfig')->willReturn($config['auto-provision']['update'] ?? []);
+		$this->client->method('getIdentityClaim')->willReturn($this->client->getAutoProvisionConfig()['search-attribute'] ?? 'email');
+		$this->client->method('mode')->willReturn($config['mode'] ?? 'userid');
+		$this->client->method('getUserEmail')->willReturn($this->client->mode() === 'email'
+			? $userInfo[$idClaim] ?? ''
+			: $userInfo[$emailClaim] ??'');
+		$this->client->method('getUserDisplayName')->willReturn($userInfo[$dnClaim] ?? '');
 
 		if ($expectException) {
 			$this->expectException(LoginException::class);
@@ -211,8 +240,8 @@ class AutoProvisioningServiceTest extends TestCase {
 			$user->method('getEMailAddress')->willReturn($currentEmail);
 			$user->method('getDisplayName')->willReturn($currentDN);
 
-			$user->expects($expectEmailToBeSet ? self::once() : self::never())->method('setEMailAddress')->with($userInfo['email']);
-			$user->expects($expectDisplayName ? self::once() : self::never())->method('setDisplayName')->with($userInfo['name']);
+			$user->expects($expectEmailToBeSet ? self::once() : self::never())->method('setEMailAddress')->with($userInfo['email'] ?? '');
+			$user->expects($expectDisplayName ? self::once() : self::never())->method('setDisplayName')->with($userInfo['name'] ?? '');
 			$this->userManager->expects(self::once())->method('createUser')->willReturn($user);
 		}
 		$this->autoProvisioningService->updateAccountInfo($user, $userInfo, $force);
