@@ -219,17 +219,18 @@ class AutoProvisioningServiceTest extends TestCase {
 		array $userInfo
 	): void {
 		$user = $this->createMock(IUser::class);
-		$idClaim = $config['search-attribute'] ?? 'email';
-		$emailClaim = $this->client->getAutoProvisionConfig()['email-claim'] ?? null;
-		$dnClaim = $this->client->getAutoProvisionConfig()['display-name-claim'] ?? null;
-
 		$this->client->method('getAutoProvisionConfig')->willReturn($this->client->getOpenIdConfig()['auto-provision'] ?? []);
 		$this->client->method('getAutoUpdateConfig')->willReturn($config['auto-provision']['update'] ?? []);
-		$this->client->method('getIdentityClaim')->willReturn($this->client->getAutoProvisionConfig()['search-attribute'] ?? 'email');
-		$this->client->method('mode')->willReturn($config['mode'] ?? 'userid');
-		$this->client->method('getUserEmail')->willReturn($this->client->mode() === 'email'
-			? $userInfo[$idClaim] ?? ''
-			: $userInfo[$emailClaim] ??'');
+		$this->client->method('getIdentityClaim')->willReturn($config['auto-provision']['search-attribute'] ?? 'email');
+
+		$mode = $config['mode'] ?? 'userid';
+		$idClaim = $config['search-attribute'] ?? 'email';
+		$emailClaim = $config['auto-provision']['email-claim'] ?? null;
+		$dnClaim = $config['auto-provision']['display-name-claim'] ?? null;
+		$email = $mode=== 'email' ? $userInfo[$idClaim] ?? '': $userInfo[$emailClaim] ?? '';
+
+		$this->client->method('mode')->willReturn($mode);
+		$this->client->method('getUserEmail')->willReturn($email);
 		$this->client->method('getUserDisplayName')->willReturn($userInfo[$dnClaim] ?? '');
 
 		if ($expectException) {
@@ -239,10 +240,8 @@ class AutoProvisioningServiceTest extends TestCase {
 			$user->method('canChangeDisplayName')->willReturn($canChangeDN);
 			$user->method('getEMailAddress')->willReturn($currentEmail);
 			$user->method('getDisplayName')->willReturn($currentDN);
-
 			$user->expects($expectEmailToBeSet ? self::once() : self::never())->method('setEMailAddress')->with($userInfo['email'] ?? '');
 			$user->expects($expectDisplayName ? self::once() : self::never())->method('setDisplayName')->with($userInfo['name'] ?? '');
-			$this->userManager->expects(self::once())->method('createUser')->willReturn($user);
 		}
 		$this->autoProvisioningService->updateAccountInfo($user, $userInfo, $force);
 	}

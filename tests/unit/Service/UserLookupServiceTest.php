@@ -71,6 +71,8 @@ class UserLookupServiceTest extends TestCase {
 		$this->expectException(LoginException::class);
 		$this->expectExceptionMessage('User with foo@example.com is not known.');
 		$this->client->method('getOpenIdConfig')->willReturn([]);
+		$this->client->method('mode')->willReturn('email');
+		$this->client->method('getIdentityClaim')->willReturn('email');
 		$this->userLookup->lookupUser((object)['email' => 'foo@example.com']);
 	}
 
@@ -79,6 +81,8 @@ class UserLookupServiceTest extends TestCase {
 		$this->expectExceptionMessage('foo@example.com is not unique.');
 		$this->client->method('getOpenIdConfig')->willReturn([]);
 		$this->manager->method('getByEmail')->willReturn([1, 2]);
+		$this->client->method('mode')->willReturn('email');
+		$this->client->method('getIdentityClaim')->willReturn('email');
 		$this->userLookup->lookupUser((object)['email' => 'foo@example.com']);
 	}
 
