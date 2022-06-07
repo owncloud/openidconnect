@@ -1,7 +1,7 @@
 <?php
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
- * 
+ *
  * @copyright Copyright (c) 2020, ownCloud GmbH
  * @license GPL-2.0
  *

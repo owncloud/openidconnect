@@ -2,7 +2,7 @@
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  * @author Miroslav Bauer <Miroslav.Bauer@cesnet.cz>
- * 
+ *
  * @copyright Copyright (c) 2022, ownCloud GmbH
  * @license GPL-2.0
  *
@@ -245,7 +245,6 @@ class AutoProvisioningServiceTest extends TestCase {
 		}
 		$this->autoProvisioningService->updateAccountInfo($user, $userInfo, $force);
 	}
-
 
 	public function providesProvisioningData(): array {
 		return [

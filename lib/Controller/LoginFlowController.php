@@ -2,7 +2,7 @@
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  * @author Miroslav Bauer <Miroslav.Bauer@cesnet.cz>
- * 
+ *
  * @copyright Copyright (c) 2022, ownCloud GmbH
  * @license GPL-2.0
  *
@@ -71,7 +71,6 @@ class LoginFlowController extends Controller {
 	 * @var AutoProvisioningService
 	 */
 	private $autoProvisioningService;
-
 
 	public function __construct(
 		string $appName,
