@@ -88,6 +88,31 @@ class Client extends OpenIDConnectClient {
 		if (isset($openIdConfig['auth-params'])) {
 			$this->addAuthParam($openIdConfig['auth-params']);
 		}
+		// set http proxy if defined in config
+		$proxy = $this->getProxyUri();
+		if ($proxy) {
+			$this->setHttpProxy($proxy);
+		}
+	}
+
+	/**
+	 * Get the proxy URI
+	 *
+	 * @return string
+	 */
+	private function getProxyUri() {
+		$proxyHost = $this->config->getSystemValue('proxy', null);
+		$proxyUserPwd = $this->config->getSystemValue('proxyuserpwd', null);
+		$proxyUri = '';
+
+		if ($proxyUserPwd !== null) {
+			$proxyUri .= $proxyUserPwd . '@';
+		}
+		if ($proxyHost !== null) {
+			$proxyUri .= $proxyHost;
+		}
+
+		return $proxyUri;
 	}
 
 	/**
