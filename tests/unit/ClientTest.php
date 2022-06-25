@@ -122,6 +122,12 @@ class ClientTest extends TestCase {
 					'auth-params' => ['foo'],
 				];
 			}
+			if ($key === 'proxy') {
+				return null;
+			}
+			if ($key === 'proxyuserpwd') {
+				return null;
+			}
 			throw new \InvalidArgumentException("Unexpected key: $key");
 		});
 		$this->client = $this->getMockBuilder(Client::class)
@@ -149,6 +155,12 @@ class ClientTest extends TestCase {
 					'insecure' => true
 				];
 			}
+			if ($key === 'proxy') {
+				return null;
+			}
+			if ($key === 'proxyuserpwd') {
+				return null;
+			}
 			throw new \InvalidArgumentException("Unexpected key: $key");
 		});
 		$this->client = $this->getMockBuilder(Client::class)
@@ -174,6 +186,12 @@ class ClientTest extends TestCase {
 					'client-secret' => 'secret',
 					'use-access-token-payload-for-user-info' => $useAccessTokenPayloadForUserInfo
 				];
+			}
+			if ($key === 'proxy') {
+				return null;
+			}
+			if ($key === 'proxyuserpwd') {
+				return null;
 			}
 			throw new \InvalidArgumentException("Unexpected key: $key");
 		});
