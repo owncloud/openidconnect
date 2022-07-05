@@ -21,7 +21,7 @@
  */
 namespace OCA\OpenIdConnect\Controller;
 
-use JuliusPC\OpenIDConnectClientException;
+use Jumbojett\OpenIDConnectClientException;
 use OC\HintException;
 use OC\User\LoginException;
 use OC\User\Session;
