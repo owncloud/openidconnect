@@ -163,7 +163,9 @@ class Client extends OpenIDConnectClient {
 	public function getUserInfo() {
 		$openIdConfig = $this->getOpenIdConfig();
 		if (isset($openIdConfig['use-access-token-payload-for-user-info']) && $openIdConfig['use-access-token-payload-for-user-info']) {
-			return $this->getAccessTokenPayload();
+			if ($payload = $this->getAccessTokenPayload()) {
+				return $payload;
+			}
 		}
 
 		if (isset($openIdConfig['use-access-token-introspection-for-user-info']) && $openIdConfig['use-access-token-introspection-for-user-info']) {

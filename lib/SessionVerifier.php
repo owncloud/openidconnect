@@ -99,7 +99,10 @@ class SessionVerifier {
 
 		$client->setAccessToken($accessToken);
 		$openIdConfig = $client->getOpenIdConfig();
-		if (isset($openIdConfig['use-token-introspection-endpoint']) && $openIdConfig['use-token-introspection-endpoint']) {
+
+		# if the access token is a JWT we use it for verification
+		$payload = $this->client->getAccessTokenPayload();
+		if (!$payload) {
 			$introspectionClientId = $openIdConfig['token-introspection-endpoint-client-id'] ?? null;
 			$introspectionClientSecret = $openIdConfig['token-introspection-endpoint-client-secret'] ?? null;
 

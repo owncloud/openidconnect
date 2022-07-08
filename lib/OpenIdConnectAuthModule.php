@@ -156,10 +156,10 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		if ($userInfo) {
 			return $userInfo['exp'];
 		}
-		# TODO: add PoP specific verification
 		$config = $this->client->getOpenIdConfig();
-		$useIntrospectionEndpoint = $config['use-token-introspection-endpoint'] ?? false;
-		if ($useIntrospectionEndpoint) {
+		$payload = $this->client->getAccessTokenPayload();
+
+		if (!$payload) {
 			$introspectionClientId = $config['token-introspection-endpoint-client-id'] ?? null;
 			$introspectionClientSecret = $config['token-introspection-endpoint-client-secret'] ?? null;
 
