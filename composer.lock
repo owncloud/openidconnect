@@ -12,12 +12,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/jumbojett/OpenID-Connect-PHP.git",
-                "reference": "bdac32381916ac15772cef2c42af8f354df6c871"
+                "reference": "ca7429b218d5f043cc440dcd98fc27e4e0f1e418"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/jumbojett/OpenID-Connect-PHP/zipball/bdac32381916ac15772cef2c42af8f354df6c871",
-                "reference": "bdac32381916ac15772cef2c42af8f354df6c871",
+                "url": "https://api.github.com/repos/jumbojett/OpenID-Connect-PHP/zipball/ca7429b218d5f043cc440dcd98fc27e4e0f1e418",
+                "reference": "ca7429b218d5f043cc440dcd98fc27e4e0f1e418",
                 "shasum": ""
             },
             "require": {
@@ -46,7 +46,7 @@
                 "issues": "https://github.com/jumbojett/OpenID-Connect-PHP/issues",
                 "source": "https://github.com/jumbojett/OpenID-Connect-PHP/tree/feat/support-header-jwk"
             },
-            "time": "2022-07-05T09:36:25+00:00"
+            "time": "2022-07-08T11:06:25+00:00"
         },
         {
             "name": "paragonie/constant_time_encoding",
