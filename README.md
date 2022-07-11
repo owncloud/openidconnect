@@ -122,7 +122,7 @@ $CONFIG = [
 #### Setup auto-update of user account info
 
 The provisioning auto-update mode will update user account info with current information provided by the OpenID Connect provider
-upon each log in. Account attributes, that will be updated, can be specified in `attributes` config option.
+upon each log in.
 
 ```php
 $CONFIG = [
@@ -131,8 +131,6 @@ $CONFIG = [
       'update' => [
         // enable the user info auto-update mode
         'enabled' => true,
-        // defines account attributes that will be auto-updated
-        'attributes' => ['email', 'display-name'],
       ],
     ],
   ],

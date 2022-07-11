@@ -137,8 +137,7 @@ class AutoProvisioningService {
 		if (!($this->autoUpdateEnabled() || $force)) {
 			throw new LoginException('Account auto-update is disabled.');
 		}
-		$attributes = $this->client->getAutoUpdateConfig()['attributes'] ?? ['email', 'display-name'];
-		if ($force || (\in_array('email', $attributes) && $user->canChangeMailAddress())) {
+		if ($force || $user->canChangeMailAddress()) {
 			$currentEmail = $this->client->getUserEmail($userInfo);
 			if ($currentEmail && $currentEmail !== $user->getEMailAddress()) {
 				$this->logger->debug('AutoProvisioningService: setting e-mail to ' . $currentEmail);
@@ -146,7 +145,7 @@ class AutoProvisioningService {
 			}
 		}
 
-		if ($force || (\in_array('display-name', $attributes) && $user->canChangeDisplayName())) {
+		if ($force || $user->canChangeDisplayName()) {
 			$currentDN = $this->client->getUserDisplayName($userInfo);
 			if ($currentDN && $currentDN !== $user->getDisplayName()) {
 				$this->logger->debug('AutoProvisioningService: setting display name to ' . $currentDN);

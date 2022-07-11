@@ -277,17 +277,13 @@ class AutoProvisioningServiceTest extends TestCase {
 			[false, false, true, true, true, true, '', '', ['auto-provision' => ['enabled' => true, 'display-name-claim' => 'name', 'email-claim' => 'email', 'update' => ['enabled' => true]]], ['email' => 'alice@example.net', 'name' => 'John']],
 			# 5. update enabled, used without auto-provisioning mode
 			[false, false, true, true, true, true, '', '', ['auto-provision' => ['enabled' => false, 'update' => ['enabled' => true], 'display-name-claim' => 'name', 'email-claim' => 'email']], ['email' => 'alice@example.net', 'name' => 'John']],
-			# 6. configured to update display name only
-			[false, false, false, true, true, true, '', '', [ 'auto-provision' => ['enabled' => true, 'display-name-claim' => 'name', 'email-claim' => 'email', 'update' => ['enabled' => true, 'attributes' => ['display-name']]]], ['email' => 'alice@example.net', 'name' => 'John']],
-			# 7. configured to update e-mail only
-			[false, false, true, false, true, true, '', '', [ 'auto-provision' => ['enabled' => true, 'display-name-claim' => 'name', 'email-claim' => 'email', 'update' => ['enabled' => true, 'attributes' => ['email']]]], ['email' => 'alice@example.net', 'name' => 'John']],
-			# 8. not updating if attributes are missing in userInfo
-			[false, false, false, false, true, true, 'alice@example.net', 'John', [ 'auto-provision' => ['enabled' => true, 'display-name-claim' => 'name', 'email-claim' => 'email', 'update' => ['enabled' => true, 'attributes' => ['email']]]], []],
-			# 9. not updating email if not allowed by user's backend
+			# 6. not updating if attributes are missing in userInfo
+			[false, false, false, false, true, true, 'alice@example.net', 'John', [ 'auto-provision' => ['enabled' => true, 'display-name-claim' => 'name', 'email-claim' => 'email', 'update' => ['enabled' => true]]], []],
+			# 7. not updating email if not allowed by user's backend
 			[false, false, false, true, false, true, '', '', [ 'auto-provision' => ['enabled' => true, 'display-name-claim' => 'name', 'email-claim' => 'email', 'update' => ['enabled' => true]]], ['email' => 'alice@example.net', 'name' => 'John']],
-			# 10. not updating display name if not allowed by user's backend
+			# 8. not updating display name if not allowed by user's backend
 			[false, false, true, false, true, false, '', '', [ 'auto-provision' => ['enabled' => true, 'display-name-claim' => 'name', 'email-claim' => 'email', 'update' => ['enabled' => true]]], ['email' => 'alice@example.net', 'name' => 'John']],
-			# 11. not updating if nothing changed
+			# 9. not updating if nothing changed
 			[false, false, false, false, true, true, 'alice@example.net', 'John', [ 'auto-provision' => ['enabled' => true, 'display-name-claim' => 'name', 'email-claim' => 'email', 'update' => ['enabled' => true]]], ['email' => 'alice@example.net', 'name' => 'John']]
 		];
 	}
