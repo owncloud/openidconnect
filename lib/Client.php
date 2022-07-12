@@ -1,8 +1,9 @@
 <?php
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
+ * @author Miroslav Bauer <Miroslav.Bauer@cesnet.cz>
  *
- * @copyright Copyright (c) 2020, ownCloud GmbH
+ * @copyright Copyright (c) 2022, ownCloud GmbH
  * @license GPL-2.0
  *
  * This program is free software; you can redistribute it and/or
@@ -110,6 +111,14 @@ class Client extends OpenIDConnectClient {
 		return $this->config->getSystemValue('openid-connect', null);
 	}
 
+	public function getAutoProvisionConfig(): array {
+		return $this->getOpenIdConfig()['auto-provision'];
+	}
+
+	public function getAutoUpdateConfig(): array {
+		return $this->getAutoProvisionConfig()['update'];
+	}
+
 	/**
 	 * @throws OpenIDConnectClientException
 	 */
@@ -121,6 +130,10 @@ class Client extends OpenIDConnectClient {
 		return $this->wellKnownConfig;
 	}
 
+	public function mode() {
+		return $this->getOpenIdConfig()['mode'] ?? 'userid';
+	}
+
 	public function getUserInfo() {
 		$openIdConfig = $this->getOpenIdConfig();
 		if (isset($openIdConfig['use-access-token-payload-for-user-info']) && $openIdConfig['use-access-token-payload-for-user-info']) {
@@ -128,6 +141,47 @@ class Client extends OpenIDConnectClient {
 		}
 
 		return $this->requestUserInfo();
+	}
+
+	public function getIdentityClaim() {
+		return $this->getOpenIdConfig()['search-attribute'] ?? 'email';
+	}
+
+	public function getEmailClaim(): ?string {
+		return $this->getAutoProvisionConfig()['email-claim'] ?? null;
+	}
+
+	public function getDisplayNameClaim(): ?string {
+		return $this->getAutoProvisionConfig()['display-name-claim'] ??	null;
+	}
+
+	public function getPictureClaim(): ?string {
+		return $this->getAutoProvisionConfig()['picture-claim'] ?? null;
+	}
+
+	public function getUserEmail($userInfo): ?string {
+		$email = $this->mode() === 'email' ? $userInfo->{$this->getIdentityClaim()} : null;
+		$emailClaim = $this->getEmailClaim();
+		if (!$email && $emailClaim) {
+			return $userInfo->$emailClaim;
+		}
+		return $email;
+	}
+
+	public function getUserDisplayName($userInfo): ?string {
+		$displayNameClaim = $this->getDisplayNameClaim();
+		if ($displayNameClaim) {
+			return $userInfo->$displayNameClaim;
+		}
+		return null;
+	}
+
+	public function getUserPicture($userInfo): ?string {
+		$pictureClaim = $this->getPictureClaim();
+		if ($pictureClaim) {
+			return $userInfo->$pictureClaim;
+		}
+		return null;
 	}
 
 	public function storeRedirectUrl(?string $redirectUrl): void {

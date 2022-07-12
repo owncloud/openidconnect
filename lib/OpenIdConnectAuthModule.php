@@ -1,8 +1,9 @@
 <?php
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
+ * @author Miroslav Bauer <Miroslav.Bauer@cesnet.cz>
  *
- * @copyright Copyright (c) 2020, ownCloud GmbH
+ * @copyright Copyright (c) 2022, ownCloud GmbH
  * @license GPL-2.0
  *
  * This program is free software; you can redistribute it and/or
@@ -23,6 +24,7 @@ namespace OCA\OpenIdConnect;
 
 use JuliusPC\OpenIDConnectClientException;
 use OC\User\LoginException;
+use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\Authentication\IAuthModule;
 use OCP\ICache;
@@ -51,6 +53,8 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	private $client;
 	/** @var UserLookupService */
 	private $lookupService;
+	/** @var AutoProvisioningService */
+	private $autoProvisioningService;
 
 	/**
 	 * OpenIdConnectAuthModule constructor.
@@ -60,19 +64,22 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	 * @param ICacheFactory $cacheFactory
 	 * @param UserLookupService $lookupService
 	 * @param Client $client
+	 * @param AutoProvisioningService $autoProvisioningService
 	 */
 	public function __construct(
 		IUserManager $manager,
 		ILogger $logger,
 		ICacheFactory $cacheFactory,
 		UserLookupService $lookupService,
-		Client $client
+		Client $client,
+		AutoProvisioningService $autoProvisioningService
 	) {
 		$this->manager = $manager;
 		$this->logger = new Logger($logger);
 		$this->cacheFactory = $cacheFactory;
 		$this->client = $client;
 		$this->lookupService = $lookupService;
+		$this->autoProvisioningService = $autoProvisioningService;
 	}
 
 	/**
@@ -196,14 +203,18 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		}
 
 		$this->client->setAccessToken($bearerToken);
-
 		$userInfo = $this->client->getUserInfo();
 		$this->logger->debug('OpenIdConnectAuthModule::getUserResource from cache: ' . \json_encode($userInfo));
 		if ($userInfo === null) {
 			return null;
 		}
+		$user = $this->lookupService->lookupUser($userInfo);
 
-		return $this->lookupService->lookupUser($userInfo);
+		if ($this->autoProvisioningService->autoUpdateEnabled()) {
+			$this->autoProvisioningService->updateAccountInfo($user, $userInfo);
+		}
+
+		return $user;
 	}
 
 	private function updateCache(string $bearerToken, IUser $user, int $expiry): void {

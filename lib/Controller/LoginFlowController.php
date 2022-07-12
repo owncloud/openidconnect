@@ -1,8 +1,9 @@
 <?php
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
+ * @author Miroslav Bauer <Miroslav.Bauer@cesnet.cz>
  *
- * @copyright Copyright (c) 2020, ownCloud GmbH
+ * @copyright Copyright (c) 2022, ownCloud GmbH
  * @license GPL-2.0
  *
  * This program is free software; you can redistribute it and/or
@@ -27,6 +28,7 @@ use OC\User\LoginException;
 use OC\User\Session;
 use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\Logger;
+use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
@@ -65,6 +67,10 @@ class LoginFlowController extends Controller {
 	 * @var ICacheFactory
 	 */
 	private $memCacheFactory;
+	/**
+	 * @var AutoProvisioningService
+	 */
+	private $autoProvisioningService;
 
 	public function __construct(
 		string $appName,
@@ -74,7 +80,8 @@ class LoginFlowController extends Controller {
 		ISession $session,
 		ILogger $logger,
 		Client $client,
-		ICacheFactory $memCacheFactory
+		ICacheFactory $memCacheFactory,
+		AutoProvisioningService $autoProvisioningService
 	) {
 		parent::__construct($appName, $request);
 		if (!$userSession instanceof Session) {
@@ -87,6 +94,7 @@ class LoginFlowController extends Controller {
 		$this->client = $client;
 		$this->logger = new Logger($logger);
 		$this->memCacheFactory = $memCacheFactory;
+		$this->autoProvisioningService = $autoProvisioningService;
 	}
 
 	/**
@@ -141,6 +149,10 @@ class LoginFlowController extends Controller {
 			throw new LoginException('No user information available.');
 		}
 		$user = $this->userLookup->lookupUser($userInfo);
+
+		if ($this->autoProvisioningService->autoUpdateEnabled()) {
+			$this->autoProvisioningService->updateAccountInfo($user, $userInfo);
+		}
 
 		// trigger login process
 		if ($this->userSession->createSessionToken($this->request, $user->getUID(), $user->getUID()) &&

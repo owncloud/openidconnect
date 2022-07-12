@@ -1,8 +1,9 @@
 <?php
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
+ * @author Miroslav Bauer <Miroslav.Bauer@cesnet.cz>
  *
- * @copyright Copyright (c) 2020, ownCloud GmbH
+ * @copyright Copyright (c) 2022, ownCloud GmbH
  * @license GPL-2.0
  *
  * This program is free software; you can redistribute it and/or
@@ -27,6 +28,7 @@ use OC\Memcache\ArrayCache;
 use OC\User\LoginException;
 use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\OpenIdConnectAuthModule;
+use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\ICacheFactory;
 use OCP\ILogger;
@@ -62,6 +64,10 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 	 * @var MockObject | Client
 	 */
 	private $client;
+	/**
+	 * @var MockObject | AutoProvisioningService
+	 */
+	private $autoProvisioningService;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -70,7 +76,15 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		$this->cacheFactory = $this->createMock(ICacheFactory::class);
 		$this->lookupService = $this->createMock(UserLookupService::class);
 		$this->client = $this->createMock(Client::class);
-		$this->authModule = new OpenIdConnectAuthModule($this->manager, $this->logger, $this->cacheFactory, $this->lookupService, $this->client);
+		$this->autoProvisioningService = $this->createMock(AutoProvisioningService::class);
+		$this->authModule = new OpenIdConnectAuthModule(
+			$this->manager,
+			$this->logger,
+			$this->cacheFactory,
+			$this->lookupService,
+			$this->client,
+			$this->autoProvisioningService
+		);
 	}
 
 	public function testNoBearer(): void {
@@ -164,6 +178,25 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		$request = $this->createMock(IRequest::class);
 		$request->method('getHeader')->willReturn('Bearer 1234567890');
 
+		$this->authModule->auth($request);
+	}
+
+	public function testValidTokenWithAutoUpdate(): void {
+		$userInfo = (object)['email' => 'foo@example.com'];
+		$openIdConfig = ['auto-provision' => [ 'update' => ['enabled' => true ]]];
+		$this->client->method('getOpenIdConfig')->willReturn($openIdConfig);
+		$this->client->method('getAutoProvisionConfig')->willReturn($openIdConfig['auto-provision']);
+		$this->client->method('getUserInfo')->willReturn($userInfo);
+		$this->client->method('verifyJWTsignature')->willReturn(true);
+		$this->client->method('getAccessTokenPayload')->willReturn((object)['exp' => time() + 100]);
+		$this->autoProvisioningService->method('autoUpdateEnabled')->willReturn(true);
+		$this->cacheFactory->method('create')->willReturn(new ArrayCache());
+
+		$user = $this->createMock(IUser::class);
+		$this->lookupService->expects(self::once())->method('lookupUser')->willReturn($user);
+		$request = $this->createMock(IRequest::class);
+		$request->method('getHeader')->willReturn('Bearer 1234567890');
+		$this->autoProvisioningService->expects(self::once())->method('updateAccountInfo')->with($user, $userInfo)->willReturn(null);
 		$this->authModule->auth($request);
 	}
 }

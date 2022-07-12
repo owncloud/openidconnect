@@ -2,8 +2,9 @@
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  * @author Ilja Neumann <ineumann@owncloud.com>
+ * @author Miroslav Bauer <Miroslav.Bauer@cesnet.cz>
  *
- * @copyright Copyright (c) 2020, ownCloud GmbH
+ * @copyright Copyright (c) 2022, ownCloud GmbH
  * @license GPL-2.0
  *
  * This program is free software; you can redistribute it and/or
@@ -75,21 +76,21 @@ class AutoProvisioningService {
 	}
 
 	public function createUser($userInfo): IUser {
-		if (!$this->enabled()) {
+		if (!$this->autoProvisioningEnabled()) {
 			throw new LoginException('Auto provisioning is disabled.');
 		}
-		$attribute = $this->identityClaim();
+		$attribute = $this->client->getIdentityClaim();
 		$emailOrUserId = $userInfo->$attribute ?? null;
 		if (!$emailOrUserId) {
 			throw new LoginException("Configured attribute $attribute is not known.");
 		}
-		$userId = $this->mode() === 'email' ? $this->generateUserId() : $emailOrUserId;
+		$userId = $this->client->mode() === 'email' ? $this->generateUserId() : $emailOrUserId;
 
-		$openIdConfig = $this->getOpenIdConfiguration();
-		$provisioningClaim = $openIdConfig['auto-provision']['provisioning-claim'] ?? null;
+		$config = $this->client->getAutoProvisionConfig();
+		$provisioningClaim = $config['provisioning-claim'] ?? null;
 		if ($provisioningClaim) {
 			$this->logger->debug('ProvisioningClaim is defined for auto-provision', ['claim' => $provisioningClaim]);
-			$provisioningAttribute = $openIdConfig['auto-provision']['provisioning-attribute'] ?? null;
+			$provisioningAttribute = $config['provisioning-attribute'] ?? null;
 
 			if (!\property_exists($userInfo, $provisioningClaim) || !\is_array($userInfo->$provisioningClaim)) {
 				throw new LoginException('Required provisioning attribute is not found.');
@@ -100,36 +101,24 @@ class AutoProvisioningService {
 			}
 		}
 
-		$email = $this->mode() === 'email' ? $emailOrUserId : null;
 		$user = $this->userManager->createUser($userId, $this->generatePassword());
 		if (!$user) {
 			throw new LoginException("Unable to create user $userId");
 		}
 		$user->setEnabled(true);
 
-		if ($email) {
-			$user->setEMailAddress($email);
-		} else {
-			$emailClaim = $openIdConfig['auto-provision']['email-claim'] ?? null;
-			if ($emailClaim) {
-				$user->setEMailAddress($userInfo->$emailClaim);
-			}
-		}
-
-		$displayNameClaim = $openIdConfig['auto-provision']['display-name-claim'] ?? null;
-		if ($displayNameClaim) {
-			$user->setDisplayName($userInfo->$displayNameClaim);
-		}
-		$groups = $openIdConfig['auto-provision']['groups'] ?? [];
+		$groups = $config['groups'] ?? [];
 		foreach ($groups as $group) {
 			$g = $this->groupManager->get($group);
 			if ($g) {
 				$g->addUser($user);
 			}
 		}
-		$pictureClaim = $openIdConfig['auto-provision']['picture-claim'] ?? null;
-		if ($pictureClaim) {
-			$pictureUrl = $userInfo->$pictureClaim;
+
+		$this->updateAccountInfo($user, $userInfo, true);
+
+		$pictureUrl = $this->client->getUserPicture($userInfo);
+		if ($pictureUrl) {
 			try {
 				$resource = $this->downloadPicture($pictureUrl);
 				$av = $this->avatarManager->getAvatar($user->getUID());
@@ -143,20 +132,34 @@ class AutoProvisioningService {
 
 		return $user;
 	}
-	public function getOpenIdConfiguration(): array {
-		return $this->client->getOpenIdConfig() ?? [];
+
+	public function updateAccountInfo(IUser $user, $userInfo, bool $force = false) {
+		if (!($this->autoUpdateEnabled() || $force)) {
+			throw new LoginException('Account auto-update is disabled.');
+		}
+		if ($force || $user->canChangeMailAddress()) {
+			$currentEmail = $this->client->getUserEmail($userInfo);
+			if ($currentEmail && $currentEmail !== $user->getEMailAddress()) {
+				$this->logger->debug('AutoProvisioningService: setting e-mail to ' . $currentEmail);
+				$user->setEMailAddress($currentEmail);
+			}
+		}
+
+		if ($force || $user->canChangeDisplayName()) {
+			$currentDN = $this->client->getUserDisplayName($userInfo);
+			if ($currentDN && $currentDN !== $user->getDisplayName()) {
+				$this->logger->debug('AutoProvisioningService: setting display name to ' . $currentDN);
+				$user->setDisplayName($currentDN);
+			}
+		}
+	}
+	
+	public function autoProvisioningEnabled(): bool {
+		return \boolval($this->client->getAutoProvisionConfig()['enabled'] ?? false);
 	}
 
-	public function enabled(): bool {
-		return $this->getOpenIdConfiguration()['auto-provision']['enabled'] ?? false;
-	}
-
-	private function mode() {
-		return $this->getOpenIdConfiguration()['mode'] ?? 'userid';
-	}
-
-	private function identityClaim() {
-		return $this->getOpenIdConfiguration()['search-attribute'] ?? 'email';
+	public function autoUpdateEnabled(): bool {
+		return \boolval($this->client->getAutoUpdateConfig()['enabled'] ?? false);
 	}
 
 	protected function downloadPicture(string $pictureUrl): string {

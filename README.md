@@ -1,4 +1,5 @@
 # OpenId Connect for ownCloud
+
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=owncloud_openidconnect&metric=alert_status)](https://sonarcloud.io/dashboard?id=owncloud_openidconnect)
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=owncloud_openidconnect&metric=security_rating)](https://sonarcloud.io/dashboard?id=owncloud_openidconnect)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=owncloud_openidconnect&metric=coverage)](https://sonarcloud.io/dashboard?id=owncloud_openidconnect)
@@ -6,11 +7,13 @@
 ## Configuration
 
 ### General
+
 A distributed memcache setup is required to properly operate this app - like Redis or memcached.
 For development purpose APCu is reasonable as well.
 Please follow the [documentation on how to set up caching](https://doc.owncloud.org/server/admin_manual/configuration/server/caching_configuration.html#supported-caching-backends).
 
 ### Setup
+
 The OpenId integration is established by either entering the parameters below to the
 ownCloud configuration file or saving them to the app config database table.
 
@@ -19,16 +22,17 @@ Provider setup.
 _loginButtonName_ can be chosen freely depending on the installation.
 
 ### Settings in database
-If you run a clustered setup, the following method is preferred because it is stateless. The OpenID Connect app checks for settings in the database first. If none is found, it falls back to the settings stored in `config.php`. If a malformed JSON string is found, an error is logged. You have to store your settings as a JSON formatted string in the ownCloud database table `oc_appconfig` with the following keys: 
 
-| Key           | Value            |
-| ------------- | -------------    |
-| appid         | 'openidconnect'  |
-| configkey     | 'openid-connect' |
-| configvalue   | _JSON-String_    |
+If you run a clustered setup, the following method is preferred because it is stateless. The OpenID Connect app checks for settings in the database first. If none is found, it falls back to the settings stored in `config.php`. If a malformed JSON string is found, an error is logged. You have to store your settings as a JSON formatted string in the ownCloud database table `oc_appconfig` with the following keys:
 
+| Key         | Value            |
+| ----------- | ---------------- |
+| appid       | 'openidconnect'  |
+| configkey   | 'openid-connect' |
+| configvalue | _JSON-String_    |
 
 The _key->value_ pairs are the same as when storing them to the `config.php` file. The preferred method is using the occ command:
+
 ```
 occ config:app:set openidconnect openid-connect \
 --value='{"provider-url":"https:\/\/idp.example.net","client-id":"fc9b5c78-ec73-47bf-befc-59d4fe780f6f","client-secret":"e3e5b04a-3c3c-4f4d-b16c-2a6e9fdd3cd1","loginButtonName":"Login via OpenId Connect"}'
@@ -48,25 +52,25 @@ INSERT INTO oc_appconfig (
 );
 ```
 
-
 Note: The app checks for settings in the database first. If none is found it falls back to the config.php. If a malformed JSON string is found an error is thrown to the logger instance.
 
 ### Settings in config.php
+
 ```php
 <?php
 $CONFIG = [
   'openid-connect' => [
-	'provider-url' => 'https://idp.example.net',
-	'client-id' => 'fc9b5c78-ec73-47bf-befc-59d4fe780f6f',
-	'client-secret' => 'e3e5b04a-3c3c-4f4d-b16c-2a6e9fdd3cd1',
-	'loginButtonName' => 'OpenId Connect'
-  ]
+    'provider-url' => 'https://idp.example.net',
+    'client-id' => 'fc9b5c78-ec73-47bf-befc-59d4fe780f6f',
+    'client-secret' => 'e3e5b04a-3c3c-4f4d-b16c-2a6e9fdd3cd1',
+    'loginButtonName' => 'OpenId Connect',
+  ],
 ];
-
 ```
 
 The above configuration assumes that the OpenId Provider is supporting service discovery.
 If not the endpoint configuration has to be done manually as follows:
+
 ```php
 <?php
 $CONFIG = [
@@ -83,33 +87,53 @@ $CONFIG = [
       'userinfo_endpoint' => '...',
       'registration_endpoint' => '...',
       'end_session_endpoint' => '...',
-      'jwks_uri' => '...'
-    ]
-  ]
+      'jwks_uri' => '...',
+    ],
+  ],
 ];
 ```
 
 ### Setup auto provisioning mode
+
 The auto provisioning mode will create a user based on the provided user information as returned by the OpenID Connect provider.
 The config parameters 'mode' and 'search-attribute' will be used to create a unique user so that the lookup mechanism can find the user again.
+
 ```php
 <?php
 $CONFIG = [
   'openid-connect' => [
     'auto-provision' => [
       // explicit enable the auto provisioning mode
-      'enabled' => true, 
+      'enabled' => true,
       // documentation about standard claims: https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims
       // only relevant in userid mode,  defines the claim which holds the email of the user
-      'email-claim' => 'email', 
+      'email-claim' => 'email',
       // defines the claim which holds the display name of the user
-      'display-name-claim' => 'given_name', 
+      'display-name-claim' => 'given_name',
       // defines the claim which holds the picture of the user - must be a URL
-      'picture-claim' => 'picture', 
+      'picture-claim' => 'picture',
       // defines a list of groups to which the newly created user will be added automatically
-      'groups' => ['admin', 'guests', 'employees'], 
-    ]
-  ]
+      'groups' => ['admin', 'guests', 'employees'],
+    ],
+  ],
+];
+```
+
+#### Setup auto-update of user account info
+
+The provisioning auto-update mode will update user account info with current information provided by the OpenID Connect provider
+upon each log in.
+
+```php
+$CONFIG = [
+  'openid-connect' => [
+    'auto-provision' => [
+      'update' => [
+        // enable the user info auto-update mode
+        'enabled' => true,
+      ],
+    ],
+  ],
 ];
 ```
 
@@ -132,19 +156,21 @@ $CONFIG = [
 - allowed-user-backends - limit the users which are allowed to login to a specific user backend - e.g. LDAP
 - use-access-token-payload-for-user-info - if set to true any user information will be read from the access token. If set to false the userinfo endpoint is used (starting app version 1.1.0)
 
-
 ### Setup within the OpenId Provider
-When registering ownCloud as OpenId Client use ```https://cloud.example.net/index.php/apps/openidconnect/redirect``` as redirect url .
+
+When registering ownCloud as OpenId Client use `https://cloud.example.net/index.php/apps/openidconnect/redirect` as redirect url .
 
 In case [OpenID Connect Front-Channel Logout 1.0](https://openid.net/specs/openid-connect-frontchannel-1_0.html)
-is supported please enter ```https://cloud.example.net/index.php/apps/openidconnect/logout``` as logout url within the client registration of the OpenId Provider.
-We require ```frontchannel_logout_session_required``` to be true.
+is supported please enter `https://cloud.example.net/index.php/apps/openidconnect/logout` as logout url within the client registration of the OpenId Provider.
+We require `frontchannel_logout_session_required` to be true.
 
 ### Setup service discovery
+
 In order to allow other clients to use OpenID Connect when talking to ownCloud please setup
 a redirect on the web server to point .well-known/openid-configuration to /index.php/apps/openidconnect/config
 
 This is an .htaccess example
+
 ```
   RewriteRule ^\.well-known/openid-configuration /index.php/apps/openidconnect/config [P]
 ```
@@ -157,55 +183,61 @@ There are various Open Source IdPs out there. The one with the most features imp
 CAUTION: node-oidc-provider does not accept the redirect URLs we need for owncloud clients. For release testing, use kopano konnectd instead.
 
 To set it up locally do the following:
+
 1. Clone panva/node-oidc-provider
 2. yarn install
 3. cd example
-4. Add client config into https://github.com/panva/node-oidc-provider/blob/master/example/support/configuration.js#L14
-    ```
-    module.exports.clients = [
-      {
-        client_id: 'ownCloud',
-        client_secret: 'ownCloud',
-        grant_types: ['refresh_token', 'authorization_code'],
-        redirect_uris: ['http://localhost:8080/index.php/apps/openidconnect/redirect'],
-        frontchannel_logout_uri: 'http://localhost:8080/index.php/apps/openidconnect/logout'
-      }
-    ];
-    
-    // Enable introspection
-    module.exports.features: {
-       devInteractions: { enabled: false }, 
-       introspection: { enabled: true }, 
-       deviceFlow: { enabled: true }, 
-       revocation: { enabled: true }, 
-       issAuthResp: { enabled: true }, 
-    },
-    
-    ```
-5. Start the IdP via: ```node standalone.js```
-6. Open in browser: http://localhost:3000/.well-known/openid-configuration
-7. ownCloud configuration looks as follows:
-    ```
-    $CONFIG = [
-      'openid-connect' => [
-          'provider-url' => 'http://localhost:3000',
-          'client-id' => 'ownCloud',
-          'client-secret' => 'ownCloud',
-          'loginButtonName' => 'node-oidc-provider',
-          'mode' => 'userid',
-          'search-attribute' => 'sub',
-          'use-token-introspection-endpoint' => true,
-          // do not verify tls host or peer
-          'insecure' => true
-      ],
-    ];
+4. Add client config into <https://github.com/panva/node-oidc-provider/blob/master/example/support/configuration.js#L14>
 
-    ```
-8. Clients can now use http://localhost:3000/.well-known/openid-configuration to obtain all information which is necessary
-to initiate the OpenId Connect flow. Use the granted access token in any request to ownCloud within a bearer authentication header.
+   ```
+   module.exports.clients = [
+     {
+       client_id: 'ownCloud',
+       client_secret: 'ownCloud',
+       grant_types: ['refresh_token', 'authorization_code'],
+       redirect_uris: ['http://localhost:8080/index.php/apps/openidconnect/redirect'],
+       frontchannel_logout_uri: 'http://localhost:8080/index.php/apps/openidconnect/logout'
+     }
+   ];
+
+   // Enable introspection
+   module.exports.features: {
+      devInteractions: { enabled: false },
+      introspection: { enabled: true },
+      deviceFlow: { enabled: true },
+      revocation: { enabled: true },
+      issAuthResp: { enabled: true },
+   },
+
+   ```
+
+5. Start the IdP via: `node standalone.js`
+6. Open in browser: <http://localhost:3000/.well-known/openid-configuration>
+7. ownCloud configuration looks as follows:
+
+   ```
+   $CONFIG = [
+     'openid-connect' => [
+         'provider-url' => 'http://localhost:3000',
+         'client-id' => 'ownCloud',
+         'client-secret' => 'ownCloud',
+         'loginButtonName' => 'node-oidc-provider',
+         'mode' => 'userid',
+         'search-attribute' => 'sub',
+         'use-token-introspection-endpoint' => true,
+         // do not verify tls host or peer
+         'insecure' => true
+     ],
+   ];
+
+   ```
+
+8. Clients can now use <http://localhost:3000/.well-known/openid-configuration> to obtain all information which is necessary
+   to initiate the OpenId Connect flow. Use the granted access token in any request to ownCloud within a bearer authentication header.
 9. You can login with any credentials but you need to make sure that the user with the given user id exists. In a real world deployment the users will come from LDAP.
-Keep in mind that by default, oidc app will search for the `email` attribute - which is hardcoded to `johndoe@example.com` [ref](https://github.com/panva/node-oidc-provider/blob/master/example/support/account.js#L32)
-If you wish to map the login name on the oidc-provider with owncloud user ids, you can configure it as following:
+-  Keep in mind that by default, oidc app will search for the `email` attribute - which is hardcoded to `johndoe@example.com` [ref](https://github.com/panva/node-oidc-provider/blob/master/example/support/account.js#L32)
+-  If you wish to map the login name on the oidc-provider with owncloud user ids, you can configure it as following:
+
 ```
     $CONFIG = [
       'openid-connect' => [

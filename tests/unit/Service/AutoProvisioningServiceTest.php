@@ -1,8 +1,9 @@
 <?php
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
+ * @author Miroslav Bauer <Miroslav.Bauer@cesnet.cz>
  *
- * @copyright Copyright (c) 2020, ownCloud GmbH
+ * @copyright Copyright (c) 2022, ownCloud GmbH
  * @license GPL-2.0
  *
  * This program is free software; you can redistribute it and/or
@@ -64,7 +65,7 @@ class AutoProvisioningServiceTest extends TestCase {
 	 * @var IClientService|MockObject
 	 */
 	private $clientService;
-
+	
 	protected function setUp(): void {
 		parent::setUp();
 		$this->userManager = $this->createMock(IUserManager::class);
@@ -80,7 +81,7 @@ class AutoProvisioningServiceTest extends TestCase {
 			$this->avatarManager,
 			$this->clientService,
 			$logger,
-			$this->client
+			$this->client,
 		);
 	}
 
@@ -89,9 +90,9 @@ class AutoProvisioningServiceTest extends TestCase {
 	 * @param bool $expected
 	 * @param array|null $config
 	 */
-	public function testEnabled(bool $expected, array $config = null): void {
-		$this->client->method('getOpenIdConfig')->willReturn($config);
-		self::assertEquals($expected, $this->autoProvisioningService->enabled());
+	public function testAutoProvisionEnabled(bool $expected, array $config = null): void {
+		$this->client->method('getAutoProvisionConfig')->willReturn($config['auto-provision'] ?? []);
+		self::assertEquals($expected, $this->autoProvisioningService->autoProvisioningEnabled());
 	}
 
 	public function providesConfig(): array {
@@ -124,6 +125,23 @@ class AutoProvisioningServiceTest extends TestCase {
 		array $config,
 		object $userInfo
 	): void {
+		$this->client->method('getOpenIdConfig')->willReturn($config);
+		$this->client->method('getAutoProvisionConfig')->willReturn($config['auto-provision'] ?? []);
+		$this->client->method('getAutoUpdateConfig')->willReturn($config['auto-provision']['update'] ?? []);
+
+		$idClaim = $config['search-attribute'] ?? 'email';
+		$emailClaim = $this->client->getAutoProvisionConfig()['email-claim'] ?? null;
+		$dnClaim = $this->client->getAutoProvisionConfig()['display-name-claim'] ?? null;
+		$pictureClaim = $this->client->getAutoProvisionConfig()['picture-claim'] ?? null;
+
+		$this->client->method('getIdentityClaim')->willReturn($idClaim);
+		$this->client->method('mode')->willReturn($config['mode'] ?? 'userid');
+		$this->client->method('getUserEmail')->willReturn($this->client->mode() === 'email'
+			? ($idClaim ? $userInfo->{$idClaim} : '')
+			: ($emailClaim ? $userInfo->{$emailClaim} : ''));
+		$this->client->method('getUserDisplayName')->willReturn($dnClaim ? $userInfo->{$dnClaim} : '');
+		$this->client->method('getUserPicture')->willReturn($pictureClaim ? $userInfo->{$pictureClaim} : null);
+
 		if ($expectsUserToBeCreated) {
 			$user = $this->createMock(IUser::class);
 			$user->expects($expectEmailToBeSet ? self::once() : self::never())->method('setEMailAddress');
@@ -148,8 +166,84 @@ class AutoProvisioningServiceTest extends TestCase {
 		} else {
 			$this->expectException(LoginException::class);
 		}
-		$this->client->method('getOpenIdConfig')->willReturn($config);
 		$this->autoProvisioningService->createUser($userInfo);
+	}
+
+	/**
+	 * @dataProvider providesAutoUpdateConfig
+	 * @param bool $expected
+	 * @param array|null $config
+	 */
+	public function testAutoUpdateEnabled(bool $expected, array $config = null): void {
+		$this->client->method('getAutoProvisionConfig')->willReturn($config['auto-provision'] ?? []);
+		$this->client->method('getAutoUpdateConfig')->willReturn($config['auto-provision']['update'] ?? []);
+		$this->client->method('getIdentityClaim')->willReturn($config['search-attribute'] ?? 'email');
+		self::assertEquals($expected, $this->autoProvisioningService->autoUpdateEnabled());
+	}
+
+	public function providesAutoUpdateConfig(): array {
+		return [
+			[false, null],
+			[false, []],
+			[false, ['auto-provision' => []]],
+			[false, ['auto-provision' => ['update' => []]]],
+			[false, ['auto-provision' => ['update' => ['enabled' => false]]]],
+			[true, ['auto-provision' => ['update' => ['enabled' => true]]]],
+		];
+	}
+
+	/**
+	 * @dataProvider providesAttributeUpdates
+	 * @param bool $expectException
+	 * @param bool $force
+	 * @param bool $expectEmailToBeSet
+	 * @param bool $expectDisplayName
+	 * @param bool $canChangeEmail
+	 * @param bool $canChangeDN
+	 * @param string $currentEmail
+	 * @param string $currentDN
+	 * @param array $config
+	 * @param array $userInfo
+	 * @return void
+	 */
+	public function testAutoUpdate(
+		bool $expectException,
+		bool $force,
+		bool $expectEmailToBeSet,
+		bool $expectDisplayName,
+		bool $canChangeEmail,
+		bool $canChangeDN,
+		string $currentEmail,
+		string $currentDN,
+		array $config,
+		array $userInfo
+	): void {
+		$user = $this->createMock(IUser::class);
+		$this->client->method('getAutoProvisionConfig')->willReturn($this->client->getOpenIdConfig()['auto-provision'] ?? []);
+		$this->client->method('getAutoUpdateConfig')->willReturn($config['auto-provision']['update'] ?? []);
+		$this->client->method('getIdentityClaim')->willReturn($config['auto-provision']['search-attribute'] ?? 'email');
+
+		$mode = $config['mode'] ?? 'userid';
+		$idClaim = $config['search-attribute'] ?? 'email';
+		$emailClaim = $config['auto-provision']['email-claim'] ?? null;
+		$dnClaim = $config['auto-provision']['display-name-claim'] ?? null;
+		$email = $mode=== 'email' ? $userInfo[$idClaim] ?? '': $userInfo[$emailClaim] ?? '';
+
+		$this->client->method('mode')->willReturn($mode);
+		$this->client->method('getUserEmail')->willReturn($email);
+		$this->client->method('getUserDisplayName')->willReturn($userInfo[$dnClaim] ?? '');
+
+		if ($expectException) {
+			$this->expectException(LoginException::class);
+		} else {
+			$user->method('canChangeMailAddress')->willReturn($canChangeEmail);
+			$user->method('canChangeDisplayName')->willReturn($canChangeDN);
+			$user->method('getEMailAddress')->willReturn($currentEmail);
+			$user->method('getDisplayName')->willReturn($currentDN);
+			$user->expects($expectEmailToBeSet ? self::once() : self::never())->method('setEMailAddress')->with($userInfo['email'] ?? '');
+			$user->expects($expectDisplayName ? self::once() : self::never())->method('setDisplayName')->with($userInfo['name'] ?? '');
+		}
+		$this->autoProvisioningService->updateAccountInfo($user, $userInfo, $force);
 	}
 
 	public function providesProvisioningData(): array {
@@ -168,6 +262,29 @@ class AutoProvisioningServiceTest extends TestCase {
 			[false, false, false, false, false, ['auto-provision' => ['enabled' => true, 'provisioning-claim' => 'foo']], (object)['email' => 'alice@example.net', 'foo' => 'must-be-array']],
 			[false, false, false, false, false, ['auto-provision' => ['enabled' => true, 'provisioning-claim' => 'foo']], (object)['email' => 'alice@example.net', 'foo' => null]],
 			[false, false, false, false, false, ['auto-provision' => ['enabled' => true, 'provisioning-claim' => 'foo']], (object)['email' => 'alice@example.net']],
+		];
+	}
+
+	public function providesAttributeUpdates(): array {
+		return [
+			# 1. update disabled, not forced
+			[true, false, false, false, false, false, '', '', [], ['email' => 'alice@example.net']],
+			# 2. update disabled by config, but forced on a newly provisioned account
+			[false, true, true, true, false, false, '', '', ['auto-provision' => ['enabled' => false, 'update' => ['enabled' => false], 'email-claim' => 'email', 'display-name-claim' => 'name']], ['email' => 'alice@example.net', 'name' => 'John']],
+			# 3. update enabled, but missing claims in configuration
+			[false, false, false, false, true, true, '', '', ['auto-provision' => ['enabled' => false, 'update'=> ['enabled'=> true]]], ['email' => 'alice@example.net', 'name' => 'John']],
+			# 4. update enabled, used together with auto-provisioning mode
+			[false, false, true, true, true, true, '', '', ['auto-provision' => ['enabled' => true, 'display-name-claim' => 'name', 'email-claim' => 'email', 'update' => ['enabled' => true]]], ['email' => 'alice@example.net', 'name' => 'John']],
+			# 5. update enabled, used without auto-provisioning mode
+			[false, false, true, true, true, true, '', '', ['auto-provision' => ['enabled' => false, 'update' => ['enabled' => true], 'display-name-claim' => 'name', 'email-claim' => 'email']], ['email' => 'alice@example.net', 'name' => 'John']],
+			# 6. not updating if attributes are missing in userInfo
+			[false, false, false, false, true, true, 'alice@example.net', 'John', [ 'auto-provision' => ['enabled' => true, 'display-name-claim' => 'name', 'email-claim' => 'email', 'update' => ['enabled' => true]]], []],
+			# 7. not updating email if not allowed by user's backend
+			[false, false, false, true, false, true, '', '', [ 'auto-provision' => ['enabled' => true, 'display-name-claim' => 'name', 'email-claim' => 'email', 'update' => ['enabled' => true]]], ['email' => 'alice@example.net', 'name' => 'John']],
+			# 8. not updating display name if not allowed by user's backend
+			[false, false, true, false, true, false, '', '', [ 'auto-provision' => ['enabled' => true, 'display-name-claim' => 'name', 'email-claim' => 'email', 'update' => ['enabled' => true]]], ['email' => 'alice@example.net', 'name' => 'John']],
+			# 9. not updating if nothing changed
+			[false, false, false, false, true, true, 'alice@example.net', 'John', [ 'auto-provision' => ['enabled' => true, 'display-name-claim' => 'name', 'email-claim' => 'email', 'update' => ['enabled' => true]]], ['email' => 'alice@example.net', 'name' => 'John']]
 		];
 	}
 }

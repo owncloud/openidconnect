@@ -64,10 +64,10 @@ class UserLookupService {
 			throw new HintException('Configuration issue in openidconnect app');
 		}
 		$searchByEmail = true;
-		if (isset($openIdConfig['mode']) && $openIdConfig['mode'] === 'userid') {
+		if ($this->client->mode() === 'userid') {
 			$searchByEmail = false;
 		}
-		$attribute = $openIdConfig['search-attribute'] ?? 'email';
+		$attribute = $this->client->getIdentityClaim();
 		if (!\property_exists($userInfo, $attribute)) {
 			throw new LoginException("Configured attribute $attribute is not known.");
 		}
@@ -75,7 +75,7 @@ class UserLookupService {
 		if ($searchByEmail) {
 			$user = $this->userManager->getByEmail($userInfo->$attribute);
 			if (!$user) {
-				if ($this->autoProvisioningService->enabled()) {
+				if ($this->autoProvisioningService->autoProvisioningEnabled()) {
 					return $this->autoProvisioningService->createUser($userInfo);
 				}
 
@@ -89,7 +89,7 @@ class UserLookupService {
 		}
 		$user = $this->userManager->get($userInfo->$attribute);
 		if (!$user) {
-			if ($this->autoProvisioningService->enabled()) {
+			if ($this->autoProvisioningService->autoProvisioningEnabled()) {
 				return $this->autoProvisioningService->createUser($userInfo);
 			}
 			throw new LoginException("User {$userInfo->$attribute} is not known.");
