@@ -31,8 +31,11 @@ use OCA\OpenIdConnect\OpenIdConnectAuthModule;
 use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\ICacheFactory;
+use OCP\IConfig;
 use OCP\ILogger;
 use OCP\IRequest;
+use OCP\ISession;
+use OCP\IURLGenerator;
 use OCP\IUser;
 use OCP\IUserManager;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -75,7 +78,15 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		$this->logger = $this->createMock(ILogger::class);
 		$this->cacheFactory = $this->createMock(ICacheFactory::class);
 		$this->lookupService = $this->createMock(UserLookupService::class);
-		$this->client = $this->createMock(Client::class);
+
+		$config = $this->createMock(IConfig::class);
+		$generator = $this->createMock(IURLGenerator::class);
+		$session = $this->createMock(ISession::class);
+		$this->client = $this->getMockBuilder(Client::class)
+			->onlyMethods(['getUserInfo', 'refreshToken', 'signOut', 'getOpenIdConfig', 'verifyJWTsignature', 'getAccessTokenPayload', 'setAccessToken', 'introspectToken', 'getAutoProvisionConfig'])
+			->setConstructorArgs([$config, $generator, $session, $this->logger])
+			->getMock();
+
 		$this->autoProvisioningService = $this->createMock(AutoProvisioningService::class);
 		$this->authModule = new OpenIdConnectAuthModule(
 			$this->manager,
@@ -104,6 +115,8 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 
 	public function testInvalidToken(): void {
 		$this->client->method('getOpenIdConfig')->willReturn([]);
+		$this->client->method('getAccessTokenPayload')->willReturn((object)[]);
+		$this->client->method('verifyJWTsignature')->willReturn(false);
 		$this->cacheFactory->method('create')->willReturn(new ArrayCache());
 		$request = $this->createMock(IRequest::class);
 		$request->method('getHeader')->willReturn('Bearer 1234567890');

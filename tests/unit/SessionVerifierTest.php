@@ -28,7 +28,9 @@ use OCA\OpenIdConnect\Logger;
 use OCA\OpenIdConnect\SessionVerifier;
 use OCP\ICache;
 use OCP\ICacheFactory;
+use OCP\IConfig;
 use OCP\ISession;
+use OCP\IURLGenerator;
 use OCP\IUserSession;
 use PHPUnit\Framework\MockObject\MockObject;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -72,7 +74,13 @@ class SessionVerifierTest extends TestCase {
 		$this->userSession = $this->createMock(IUserSession::class);
 		$this->logger = $this->createMock(Logger::class);
 		$this->cacheFactory = $this->createMock(ICacheFactory::class);
-		$this->client = $this->createMock(Client::class);
+
+		$config = $this->createMock(IConfig::class);
+		$generator = $this->createMock(IURLGenerator::class);
+		$this->client = $this->getMockBuilder(Client::class)
+			->onlyMethods(['refreshToken', 'signOut', 'getOpenIdConfig', 'verifyJWTsignature', 'getAccessTokenPayload', 'setAccessToken', 'introspectToken'])
+			->setConstructorArgs([$config, $generator, $this->session, $this->logger])
+			->getMock();
 
 		$this->sessionVerifier = new SessionVerifier($this->logger, $this->session, $this->userSession, $this->cacheFactory, $this->dispatcher, $this->client);
 	}
