@@ -138,11 +138,11 @@ class Client extends OpenIDConnectClient {
 	}
 
 	public function getAutoProvisionConfig(): array {
-		return $this->getOpenIdConfig()['auto-provision'];
+		return $this->getOpenIdConfig()['auto-provision'] ?? [];
 	}
 
 	public function getAutoUpdateConfig(): array {
-		return $this->getAutoProvisionConfig()['update'];
+		return $this->getAutoProvisionConfig()['update'] ?? [];
 	}
 
 	/**
