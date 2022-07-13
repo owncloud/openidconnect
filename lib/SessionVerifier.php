@@ -62,6 +62,7 @@ class SessionVerifier {
 	/**
 	 * @throws HintException
 	 * @throws OpenIDConnectClientException
+	 * @throws \JsonException
 	 */
 	public function verifySession(): void {
 		// verify open id token/session
@@ -97,65 +98,26 @@ class SessionVerifier {
 			return;
 		}
 
-		$client->setAccessToken($accessToken);
-		$openIdConfig = $client->getOpenIdConfig();
-
-		# if the access token is a JWT we use it for verification
-		$payload = $this->client->getAccessTokenPayload();
-		if (!$payload) {
-			$introspectionClientId = $openIdConfig['token-introspection-endpoint-client-id'] ?? null;
-			$introspectionClientSecret = $openIdConfig['token-introspection-endpoint-client-secret'] ?? null;
-
-			if (isset($openIdConfig['exchange-token-mode-before-introspection'])) {
-				$mode = $openIdConfig['exchange-token-mode-before-introspection'];
-				$token = $mode === 'refresh-token' ? $this->session->get('oca.openid-connect.refresh-token') : $this->session->get('oca.openid-connect.access-token');
-				$this->logger->debug("Starting token-exchange to verify session with subject_token mode: $mode");
-
-				try {
-					$accessToken = $this->client->exchangeToken($token, $mode);
-				} catch (\Exception $e) {
-					$this->logger->debug("Token Exchange failed, logout: " . $e->getMessage());
-					$this->logout();
-					return;
-				}
-			}
-
-			$introData = $client->introspectToken($accessToken, '', $introspectionClientId, $introspectionClientSecret);
-			$this->logger->debug('Introspection info: ' . \json_encode($introData) . ' for access token:' . $accessToken);
-			if (\property_exists($introData, 'error')) {
-				$this->logger->error('Token introspection failed: ' . \json_encode($introData));
-				$this->logout();
-				throw new HintException("Verifying token failed: {$introData->error}");
-			}
-			if (!$introData->active) {
-				$this->logger->error('Token (as per introspection) is inactive: ' . \json_encode($introData));
-				$this->logout();
-				return;
-			}
-
-			$this->getCache()->set($accessToken, $introData->exp);
-			$this->refreshToken($introData->exp);
-		} else {
-			if (!$client->verifyJWTsignature($accessToken)) {
-				$this->logger->error('Token cannot be verified: ' . $accessToken);
-				$this->logout();
-				throw new OpenIDConnectClientException('Token cannot be verified.');
-			}
-			$payload = $client->getAccessTokenPayload();
-			$this->logger->debug('Access token payload: ' . \json_encode($payload) . ' for access token:' . $accessToken);
-
-			$this->getCache()->set($accessToken, $payload->exp);
+		try {
+			$expiry = $client->verifyToken($accessToken);
+			$this->getCache()->set($accessToken, $expiry);
 			/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
-			$this->refreshToken($payload->exp);
+			$this->refreshToken($expiry);
+		} catch (\Exception $ex) {
+			$this->logout();
+			throw $ex;
 		}
 	}
 
+	/**
+	 * @throws \JsonException
+	 */
 	public function afterLogout($accessToken, $idToken): void {
 		// only call if access token is still valid
 		try {
 			$this->logger->debug('OIDC Logout: revoking token' . $accessToken);
 			$revokeData = $this->client->revokeToken($accessToken);
-			$this->logger->debug('Revocation info: ' . \json_encode($revokeData));
+			$this->logger->debug('Revocation info: ' . \json_encode($revokeData, JSON_THROW_ON_ERROR));
 		} catch (OpenIDConnectClientException $ex) {
 			$this->logger->logException($ex);
 		}
@@ -180,6 +142,7 @@ class SessionVerifier {
 	 * @param int $exp
 	 * @throws OpenIDConnectClientException
 	 * @throws HintException
+	 * @throws \JsonException
 	 */
 	private function refreshToken($exp): void {
 		$expiring = $exp - \time();
@@ -187,11 +150,11 @@ class SessionVerifier {
 			$refreshToken = $this->session->get('oca.openid-connect.refresh-token');
 			if ($refreshToken) {
 				$response = $this->client->refreshToken($refreshToken);
-				$this->logger->debug('RefreshToken response: ' . \json_encode($response));
+				$this->logger->debug('RefreshToken response: ' . \json_encode($response, JSON_THROW_ON_ERROR));
 				if (\property_exists($response, 'error')) {
-					$this->logger->error('Refresh token failed: ' . \json_encode($response));
+					$this->logger->error('Refresh token failed: ' . \json_encode($response, JSON_THROW_ON_ERROR));
 					$this->logout();
-					throw new HintException("Verifying token failed: {$response->error}");
+					throw new HintException("Verifying token failed: $response->error");
 				}
 
 				$this->session->set('oca.openid-connect.id-token', $this->client->getIdToken());

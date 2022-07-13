@@ -53,6 +53,8 @@ class Client extends OpenIDConnectClient {
 	 * @param IURLGenerator $generator
 	 * @param ISession $session
 	 * @param ILogger $logger
+	 *
+	 * @throws \JsonException
 	 */
 	public function __construct(
 		IConfig $config,
@@ -147,11 +149,12 @@ class Client extends OpenIDConnectClient {
 
 	/**
 	 * @throws OpenIDConnectClientException
+	 * @throws \JsonException
 	 */
 	public function getWellKnownConfig() {
 		if (!$this->wellKnownConfig) {
 			$well_known_config_url = \rtrim($this->getProviderURL(), '/') . '/.well-known/openid-configuration';
-			$this->wellKnownConfig = \json_decode($this->fetchURL($well_known_config_url), false);
+			$this->wellKnownConfig = \json_decode($this->fetchURL($well_known_config_url), false, 512, JSON_THROW_ON_ERROR);
 		}
 		return $this->wellKnownConfig;
 	}
@@ -160,12 +163,64 @@ class Client extends OpenIDConnectClient {
 		return $this->getOpenIdConfig()['mode'] ?? 'userid';
 	}
 
+	/**
+	 * @return object|null
+	 */
+	public function getAccessTokenPayload(): ?object {
+		return parent::getAccessTokenPayload();
+	}
+
+	/**
+	 * @throws OpenIDConnectClientException
+	 * @throws \JsonException
+	 */
+	public function verifyToken(string $token) {
+		$config = $this->getOpenIdConfig();
+		$this->setAccessToken($token);
+		$payload = $this->getAccessTokenPayload();
+		if ($payload) {
+			if (!$this->verifyJWTsignature($token)) {
+				$this->logger->error('Token cannot be verified: ' . $token);
+				throw new OpenIDConnectClientException('Token cannot be verified.');
+			}
+			$this->logger->debug('Access token payload: ' . \json_encode($payload, JSON_THROW_ON_ERROR));
+			/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
+			return $payload->exp;
+		}
+
+		# use token introspection to verify the token
+		$introspectionClientId = $config['token-introspection-endpoint-client-id'] ?? null;
+		$introspectionClientSecret = $config['token-introspection-endpoint-client-secret'] ?? null;
+		$tokenExchangeMode = $config['exchange-token-mode-before-introspection'] ?? null;
+
+		if ($tokenExchangeMode) {
+			$token = $tokenExchangeMode === 'refresh-token' ? $this->session->get('oca.openid-connect.refresh-token') : $this->session->get('oca.openid-connect.access-token');
+			$this->logger->debug("Starting token-exchange to verify session with subject_token mode: $tokenExchangeMode");
+
+			$token = $this->exchangeToken($token, $tokenExchangeMode);
+		}
+
+		$introData = $this->introspectToken($token, '', $introspectionClientId, $introspectionClientSecret);
+		$this->logger->debug('Introspection info: ' . \json_encode($introData, JSON_THROW_ON_ERROR));
+		if (\property_exists($introData, 'error')) {
+			$this->logger->error('Token introspection failed: ' . \json_encode($introData, JSON_THROW_ON_ERROR));
+			throw new OpenIDConnectClientException("Verifying token failed: {$introData->error}");
+		}
+		if (!$introData->active) {
+			$this->logger->error('Token (as per introspection) is inactive: ' . \json_encode($introData, JSON_THROW_ON_ERROR));
+			throw new OpenIDConnectClientException('Token (as per introspection) is inactive');
+		}
+		return $introData->exp;
+	}
+
+	/**
+	 * @throws OpenIDConnectClientException
+	 * @throws \JsonException
+	 */
 	public function getUserInfo() {
 		$openIdConfig = $this->getOpenIdConfig();
-		if (isset($openIdConfig['use-access-token-payload-for-user-info']) && $openIdConfig['use-access-token-payload-for-user-info']) {
-			if ($payload = $this->getAccessTokenPayload()) {
-				return $payload;
-			}
+		if ($payload = $this->getAccessTokenPayload()) {
+			return $payload;
 		}
 
 		if (isset($openIdConfig['use-access-token-introspection-for-user-info']) && $openIdConfig['use-access-token-introspection-for-user-info']) {
@@ -312,6 +367,7 @@ class Client extends OpenIDConnectClient {
 	 *
 	 * @return bool
 	 * @throws OpenIDConnectClientException
+	 * @throws \JsonException
 	 */
 	public function authenticate() : bool {
 		$redirectUrl = $this->generator->linkToRouteAbsolute('openidconnect.loginFlow.login');
