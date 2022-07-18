@@ -22,7 +22,7 @@
  */
 namespace OCA\OpenIdConnect;
 
-use JuliusPC\OpenIDConnectClientException;
+use Jumbojett\OpenIDConnectClientException;
 use OC\User\LoginException;
 use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
