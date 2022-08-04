@@ -37,36 +37,24 @@ use Test\TestCase;
 class EventHandlerTest extends TestCase {
 
 	/**
-	 * @var MockObject | ISession
-	 */
-	private $session;
-	/**
 	 * @var MockObject | EventHandler
 	 */
 	private $eventHandler;
 	/**
-	 * @var MockObject | IUserSession
-	 */
-	private $userSession;
-	/**
 	 * @var MockObject | EventDispatcherInterface
 	 */
 	private $dispatcher;
-	/**
-	 * @var MockObject | IRequest
-	 */
-	private $request;
 
 	protected function setUp(): void {
 		parent::setUp();
 		$this->dispatcher = $this->createMock(EventDispatcherInterface::class);
-		$this->request = $this->createMock(IRequest::class);
-		$this->session = $this->createMock(ISession::class);
-		$this->userSession = $this->createMock(IUserSession::class);
+		$request = $this->createMock(IRequest::class);
+		$session = $this->createMock(ISession::class);
+		$userSession = $this->createMock(IUserSession::class);
 
 		$this->eventHandler = $this->getMockBuilder(EventHandler::class)
-			->setConstructorArgs([$this->dispatcher, $this->request, $this->userSession, $this->session])
-			->setMethods(['createAuthBackend'])
+			->setConstructorArgs([$this->dispatcher, $request, $userSession, $session])
+			->onlyMethods(['createAuthBackend'])
 			->getMock();
 	}
 

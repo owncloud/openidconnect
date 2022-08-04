@@ -112,8 +112,8 @@ class OpenIdConnectAuthModule implements IAuthModule {
 			if ($this->client->getOpenIdConfig() === null) {
 				return null;
 			}
-			// 1. verify JWT signature
-			$expiry = $this->verifyJWT($type, $token);
+			// 1. verify token
+			$expiry = $this->verifyToken($token);
 
 			// 2. verify expiry
 			if ($expiry) {
@@ -150,40 +150,14 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	/**
 	 * @throws OpenIDConnectClientException
 	 */
-	private function verifyJWT(string $type, string $token) {
+	private function verifyToken(string $token) {
 		$cache = $this->getCache();
 		$userInfo = $cache->get($token);
 		if ($userInfo) {
 			return $userInfo['exp'];
 		}
-		# TODO: add PoP specific verification
-		$config = $this->client->getOpenIdConfig();
-		$useIntrospectionEndpoint = $config['use-token-introspection-endpoint'] ?? false;
-		if ($useIntrospectionEndpoint) {
-			$introspectionClientId = $config['token-introspection-endpoint-client-id'] ?? null;
-			$introspectionClientSecret = $config['token-introspection-endpoint-client-secret'] ?? null;
 
-			$introData = $this->client->introspectToken($token, '', $introspectionClientId, $introspectionClientSecret);
-			$this->logger->debug('Introspection info: ' . \json_encode($introData));
-			if (\property_exists($introData, 'error')) {
-				$this->logger->error('Token introspection failed: ' . \json_encode($introData));
-				throw new OpenIDConnectClientException("Verifying token failed: {$introData->error}");
-			}
-			if (!$introData->active) {
-				$this->logger->error('Token (as per introspection) is inactive: ' . \json_encode($introData));
-				throw new OpenIDConnectClientException('Token (as per introspection) is inactive');
-			}
-			return $introData->exp;
-		}
-		if (!$this->client->verifyJWTsignature($token)) {
-			$this->logger->error('Token cannot be verified: ' . $token);
-			throw new OpenIDConnectClientException('Token cannot be verified.');
-		}
-		$this->client->setAccessToken($token);
-		$payload = $this->client->getAccessTokenPayload();
-		$this->logger->debug('Access token payload: ' . \json_encode($payload));
-		/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
-		return $payload->exp;
+		return $this->client->verifyToken($token);
 	}
 
 	/**

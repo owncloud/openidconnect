@@ -22,6 +22,7 @@
 
 namespace OCA\OpenIdConnect\Tests\Unit;
 
+use InvalidArgumentException;
 use OCA\OpenIdConnect\Logger;
 use OCP\ILogger;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -71,7 +72,7 @@ class LoggerTest extends TestCase {
 	}
 
 	public function testLogException(): void {
-		$ex = new \InvalidArgumentException();
+		$ex = new InvalidArgumentException();
 		$this->innerLogger->expects(self::once())->method('logException')->with($ex, ['app' => 'OpenID']);
 		$this->logger->logException($ex);
 	}
