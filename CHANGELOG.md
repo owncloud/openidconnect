@@ -4,8 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased] - 
+## [2.2.0] - 2022-08-04
 
+### Fixed
+
+-  [#239](https://github.com/owncloud/openidconnect/pull/239) - fix: auto update function return
+
+### Added
+
+- [#222](https://github.com/owncloud/openidconnect/pull/222) - feat: account info auto-update
+- [#243](https://github.com/owncloud/openidconnect/pull/243) - feat: JWT token will always be used for user info, expiry and verification
 
 
 ## [2.1.1] - 2022-02-25
@@ -74,7 +82,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 - Initial Release
 
-[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.1.1...master
+[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.2.0...master
+[2.2.0]: https://github.com/owncloud/openidconnect/compare/v2.1.1...v2.2.0
 [2.1.1]: https://github.com/owncloud/openidconnect/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/owncloud/openidconnect/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/owncloud/openidconnect/compare/v1.0.0...v2.0.0
