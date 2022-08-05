@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 ### Fixed
 
 -  [#239](https://github.com/owncloud/openidconnect/pull/239) - fix: auto update function return
+-  [#246](https://github.com/owncloud/openidconnect/pull/246) - Duo SSO/code_challenge_methods_supported
 
 ### Added
 
