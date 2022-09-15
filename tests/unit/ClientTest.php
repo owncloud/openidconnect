@@ -192,12 +192,13 @@ class ClientTest extends TestCase {
 	 * @throws OpenIDConnectClientException
 	 */
 	public function testGetUserInfo($useAccessTokenPayloadForUserInfo): void {
-		$this->config->method('getSystemValue')->willReturnCallback(static function ($key) {
+		$this->config->method('getSystemValue')->willReturnCallback(static function ($key) use ($useAccessTokenPayloadForUserInfo) {
 			if ($key === 'openid-connect') {
 				return [
 					'provider-url' => '$providerUrl',
 					'client-id' => 'client-id',
 					'client-secret' => 'secret',
+					'use-access-token-payload-for-user-info' => $useAccessTokenPayloadForUserInfo
 				];
 			}
 			if ($key === 'proxy') {
@@ -219,7 +220,7 @@ class ClientTest extends TestCase {
 				'preferred_username' => 'alice@example.net'
 			]);
 		} else {
-			$this->client->expects(self::once())->method('getAccessTokenPayload')->willReturn(null);
+			$this->client->expects(self::never())->method('getAccessTokenPayload');
 			$this->client->expects(self::once())->method('requestUserInfo')->willReturn((object)[
 				'preferred_username' => 'alice@example.net'
 			]);
