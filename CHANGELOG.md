@@ -4,12 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
-## [2.2.0] - 2022-08-04
+## [2.2.0] - 2022-09-16
 
 ### Fixed
 
 -  [#239](https://github.com/owncloud/openidconnect/pull/239) - fix: auto update function return
 -  [#246](https://github.com/owncloud/openidconnect/pull/246) - Duo SSO/code_challenge_methods_supported
+-  [#250](https://github.com/owncloud/openidconnect/pull/250) - fix: user information is only read from the JWT token if configured
 
 ### Added
 
