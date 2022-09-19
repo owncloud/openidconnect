@@ -177,7 +177,8 @@ class OpenIdSabreAuthBackend implements BackendInterface {
 		$defaults = new \OC_Defaults();
 		$realm = $defaults->getName();
 
-		$response->addHeader('WWW-Authenticate', 'Bearer/PoP realm="'.$realm.'"');
+		$response->addHeader('WWW-Authenticate', 'Bearer realm="'.$realm.'"');
+		$response->addHeader('WWW-Authenticate', 'PoP realm="'.$realm.'"');
 		$response->setStatus(401);
 	}
 
