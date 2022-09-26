@@ -22,6 +22,7 @@
 namespace OCA\OpenIdConnect;
 
 use OCA\OpenIdConnect\Sabre\OpenIdSabreAuthBackend;
+use OCA\OpenIdConnect\LoginChecker;
 use OCP\IRequest;
 use OCP\ISession;
 use OCP\IUserSession;
@@ -39,17 +40,21 @@ class EventHandler {
 	private $userSession;
 	/** @var ISession */
 	private $session;
+	/** @var LoginChecker */
+	private $loginChecker;
 
 	public function __construct(
 		EventDispatcherInterface $dispatcher,
 		IRequest $request,
 		IUserSession $userSession,
-		ISession $session
+		ISession $session,
+		LoginChecker $loginChecker
 	) {
 		$this->dispatcher = $dispatcher;
 		$this->request = $request;
 		$this->userSession = $userSession;
 		$this->session = $session;
+		$this->loginChecker = $loginChecker;
 	}
 
 	public function registerEventHandler(): void {
@@ -64,6 +69,16 @@ class EventHandler {
 			if ($authPlugin instanceof Plugin) {
 				$authPlugin->addBackend($this->createAuthBackend());
 			}
+		});
+	}
+
+	public function registerLoginHook(): void {
+		$this->dispatcher->addListener('user.afterlogin', function ($event) {
+			$eventArgs = $event->getArguments();
+			if (!isset($eventArgs['loginType'])) {
+				$eventArgs['loginType'] = null;  // auth modules (oidc) don't have loginType associated
+			}
+			$this->loginChecker->ensurePasswordLoginJustForGuest($eventArgs['loginType'], $eventArgs['uid']);  // will throw a LoginException if not guest
 		});
 	}
 
