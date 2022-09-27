@@ -21,21 +21,17 @@
  */
 namespace OCA\OpenIdConnect;
 
-use OCP\IConfig;
 use OCP\IL10N;
 use OC\Helper\UserTypeHelper;
 use OC\User\LoginException;
 
 class LoginChecker {
-	/** @var IConfig */
-	private $config;
 	/** @var UserTypeHelper */
 	private $userTypeHelper;
 	/** @var IL10N*/
 	private $l10n;
 
-	public function __construct(IConfig $config, UserTypeHelper $userTypeHelper, IL10N $l10n) {
-		$this->config = $config;
+	public function __construct(UserTypeHelper $userTypeHelper, IL10N $l10n) {
 		$this->userTypeHelper = $userTypeHelper;
 		$this->l10n = $l10n;
 	}
@@ -45,10 +41,6 @@ class LoginChecker {
 	 * @throws LoginException if the uid isn't a guest
 	 */
 	public function ensurePasswordLoginJustForGuest($loginType, $uid) {
-		if (!$this->config->getSystemValue('openid-connect.basic_auth_guest_only', false)) {
-			return;
-		}
-
 		if (!$this->userTypeHelper->isGuestUser($uid) && $loginType === 'password') {
 			throw new LoginException($this->l10n->t('Only guests are allowed through this authentication mechanism'));
 		}
