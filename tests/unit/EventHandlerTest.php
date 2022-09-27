@@ -23,14 +23,17 @@
 namespace OCA\OpenIdConnect\Tests\Unit;
 
 use OCA\OpenIdConnect\EventHandler;
+use OCA\OpenIdConnect\LoginChecker;
 use OCP\IRequest;
 use OCP\ISession;
+use OCP\IUser;
 use OCP\IUserSession;
 use OCP\SabrePluginEvent;
 use PHPUnit\Framework\MockObject\MockObject;
 use Sabre\DAV\Auth\Plugin;
 use Sabre\DAV\Server;
 use Symfony\Component\EventDispatcher\Event;
+use Symfony\Component\EventDispatcher\GenericEvent;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Test\TestCase;
 
@@ -44,6 +47,8 @@ class EventHandlerTest extends TestCase {
 	 * @var MockObject | EventDispatcherInterface
 	 */
 	private $dispatcher;
+	/** @var LoginChecker */
+	private $loginChecker;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -51,9 +56,10 @@ class EventHandlerTest extends TestCase {
 		$request = $this->createMock(IRequest::class);
 		$session = $this->createMock(ISession::class);
 		$userSession = $this->createMock(IUserSession::class);
+		$this->loginChecker = $this->createMock(LoginChecker::class);
 
 		$this->eventHandler = $this->getMockBuilder(EventHandler::class)
-			->setConstructorArgs([$this->dispatcher, $request, $userSession, $session])
+			->setConstructorArgs([$this->dispatcher, $request, $userSession, $session, $this->loginChecker])
 			->onlyMethods(['createAuthBackend'])
 			->getMock();
 	}
@@ -93,5 +99,33 @@ class EventHandlerTest extends TestCase {
 		});
 		$this->eventHandler->expects(self::once())->method('createAuthBackend');
 		$this->eventHandler->registerEventHandler();
+	}
+
+	public function testAfterLoginHook(): void {
+		$this->loginChecker->expects($this->once())
+			->method('ensurePasswordLoginJustForGuest')
+			->with('customLoginType', 'myUid');
+
+		$user = $this->createMock(IUser::class);
+		$event = new GenericEvent(null, ['loginType' => 'customLoginType', 'user' => $user, 'uid' => 'myUid', 'password' => 'mypassword']);
+
+		$this->dispatcher->method('addListener')->willReturnCallback(static function ($name, $callback) use ($event) {
+			$callback($event);
+		});
+		$this->eventHandler->registerLoginHook();
+	}
+
+	public function testAfterLoginHookNoLoginType(): void {
+		$this->loginChecker->expects($this->once())
+			->method('ensurePasswordLoginJustForGuest')
+			->with(null, 'myUid');
+
+		$user = $this->createMock(IUser::class);
+		$event = new GenericEvent(null, ['user' => $user, 'uid' => 'myUid', 'password' => 'mypassword']);
+
+		$this->dispatcher->method('addListener')->willReturnCallback(static function ($name, $callback) use ($event) {
+			$callback($event);
+		});
+		$this->eventHandler->registerLoginHook();
 	}
 }
