@@ -155,6 +155,7 @@ $CONFIG = [
 - search-attribute - the attribute which is taken from the access token JWT or user info endpoint to identify the user
 - allowed-user-backends - limit the users which are allowed to login to a specific user backend - e.g. LDAP
 - use-access-token-payload-for-user-info - if set to true any user information will be read from the access token. If set to false the userinfo endpoint is used (starting app version 1.1.0)
+- jwt-self-signed-jwk-header-supported - if set to true JWK will be taken from the JWT header instead of the IdP's jwks_uri. Should only be enabled in exceptional cases as this could lead to vulnerabilities https://portswigger.net/kb/issues/00200902_jwt-self-signed-jwk-header-supported
 
 ### Setup within the OpenId Provider
 
