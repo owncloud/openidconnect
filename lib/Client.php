@@ -364,6 +364,14 @@ class Client extends OpenIDConnectClient {
 		return 'S256';
 	}
 
+	protected function verifyJWKHeader($jwk) {
+		$openIdConfig = $this->getOpenIdConfig();
+		if (isset($openIdConfig['jwt-self-signed-jwk-header-supported']) && $openIdConfig['jwt-self-signed-jwk-header-supported']) {
+			return;
+		}
+		throw new OpenIDConnectClientException('Self signed JWK header is not valid');
+	}
+
 	/**
 	 * @codeCoverageIgnore
 	 *

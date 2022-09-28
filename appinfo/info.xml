@@ -30,7 +30,7 @@ More information on setup, configuration and migration can be found in the ownCl
     <repository type="git">https://github.com/owncloud/openidconnect.git</repository>
     <screenshot>https://raw.githubusercontent.com/owncloud/screenshots/master/openidconnect/openidconnect.png</screenshot>
     <dependencies>
-        <owncloud min-version="10" max-version="10"/>
+        <owncloud min-version="10.4" max-version="10"/>
         <php min-version="7.3" />
     </dependencies>
     <types>

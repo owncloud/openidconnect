@@ -26,6 +26,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use Jumbojett\OpenIDConnectClientException;
 use OC;
 use OC\HintException;
+use OCA\OpenIdConnect\LoginChecker;
 use OCP\AppFramework\App;
 
 class Application extends App {
@@ -68,13 +69,20 @@ class Application extends App {
 		$userSession = $server->getUserSession();
 		$urlGenerator = $server->getURLGenerator();
 		$request = $server->getRequest();
+		$config = $server->getConfig();
+		$loginChecker = $this->getContainer()->query(LoginChecker::class);
+
 		$loginPage = new LoginPageBehaviour($this->logger, $userSession, $urlGenerator, $request);
 		$loginPage->handleLoginPageBehaviour($openIdConfig);
 
 		// Add event listener
 		$dispatcher = $server->getEventDispatcher();
-		$eventHandler = new EventHandler($dispatcher, $request, $userSession, $session);
+		$eventHandler = new EventHandler($dispatcher, $request, $userSession, $session, $loginChecker);
 		$eventHandler->registerEventHandler();
+		if ($config->getSystemValue('openid-connect.basic_auth_guest_only', false)) {
+			// the login hook is currently used only for this feature
+			$eventHandler->registerLoginHook();
+		}
 
 		// verify the session
 		$sessionVerifier = new SessionVerifier($this->logger, $session, $userSession, $memCacheFactory, $dispatcher, $client);
