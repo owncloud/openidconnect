@@ -8,14 +8,16 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
--  [#239](https://github.com/owncloud/openidconnect/pull/239) - fix: auto update function return
--  [#246](https://github.com/owncloud/openidconnect/pull/246) - Duo SSO/code_challenge_methods_supported
--  [#250](https://github.com/owncloud/openidconnect/pull/250) - fix: user information is only read from the JWT token if configured
+- [#239](https://github.com/owncloud/openidconnect/pull/239) - fix: auto update function return
+- [#246](https://github.com/owncloud/openidconnect/pull/246) - Duo SSO/code_challenge_methods_supported
+- [#250](https://github.com/owncloud/openidconnect/pull/250) - fix: user information is only read from the JWT token if configured
+- [#255](https://github.com/owncloud/openidconnect/pull/255) - fix: restrict usage of self signed JWK header in JWTs
 
 ### Added
 
 - [#222](https://github.com/owncloud/openidconnect/pull/222) - feat: account info auto-update
 - [#243](https://github.com/owncloud/openidconnect/pull/243) - feat: JWT token will always be used for user info, expiry and verification
+- [#253](https://github.com/owncloud/openidconnect/pull/253) - Add config option to allow basic auth only for guests
 
 
 ## [2.1.1] - 2022-02-25
