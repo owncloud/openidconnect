@@ -18,7 +18,7 @@ app_name=openidconnect
 build_dir=$(CURDIR)/build
 dist_dir=$(build_dir)/dist
 src_files=README.md LICENSE
-src_dirs=appinfo img lib vendor
+src_dirs=appinfo img l10n lib vendor
 all_src=$(src_dirs) $(src_files)
 
 occ=$(CURDIR)/../../occ
@@ -79,6 +79,7 @@ distdir:
 	rm -rf $(dist_dir)
 	mkdir -p $(dist_dir)/$(app_name)
 	cp -R $(all_src) $(dist_dir)/$(app_name)
+	rm -Rf $(dist_dir)/$(app_name)/l10n/.tx
 
 .PHONY: sign
 sign:
@@ -175,3 +176,33 @@ vendor-bin/phpstan/vendor: vendor/bamarni/composer-bin-plugin vendor-bin/phpstan
 
 vendor-bin/phpstan/composer.lock: vendor-bin/phpstan/composer.json
 	@echo phpstan composer.lock is not up to date.
+
+
+#
+# Translation
+#--------------------------------------
+
+.PHONY: l10n-push
+l10n-push:
+	cd l10n && tx -d push -s --skip --no-interactive
+
+.PHONY: l10n-pull
+l10n-pull:
+	cd l10n && tx -d pull -a --skip --minimum-perc=75
+
+.PHONY: l10n-clean
+l10n-clean:
+	rm -rf l10n/l10n.pl
+	find l10n -type f -name \*.po -or -name \*.pot | xargs rm -f
+	find l10n -type f -name uz.\* -or -name yo.\* -or -name ne.\* -or -name or_IN.\* | xargs git rm -f || true
+
+.PHONY: l10n-read
+l10n-read: l10n/l10n.pl
+	cd l10n && perl l10n.pl $(app_name) read
+
+.PHONY: l10n-write
+l10n-write: l10n/l10n.pl
+	cd l10n && perl l10n.pl $(app_name) write
+
+l10n/l10n.pl:
+	wget -qO l10n/l10n.pl https://raw.githubusercontent.com/owncloud-ci/transifex/d1c63674d791fe8812216b29da9d8f2f26e7e138/rootfs/usr/bin/l10n
