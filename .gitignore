@@ -7,6 +7,11 @@ vendor-bin/**/composer.lock
 /tests/output/
 .phpunit.result.cache
 tests/unit/PopTest.php
+l10n/.transifexrc
+l10n/templates
+l10n/*/*.po
+l10n/*.pot
+l10n/l10n.pl
 
 # SonarCloud scanner
 .scannerwork
