@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6a10d1dac14aa21a34bbf010bcedcd48",
+    "content-hash": "6f9a2df37ffdf1194f35d93513f6ff75",
     "packages": [
         {
             "name": "jumbojett/openid-connect-php",
-            "version": "v0.9.9",
+            "version": "v0.9.10",
             "source": {
                 "type": "git",
                 "url": "https://github.com/jumbojett/OpenID-Connect-PHP.git",
-                "reference": "f69b40f755f6a38ce4c1be2e347aa3faa7c82d04"
+                "reference": "45aac47b525f0483dd4db3324bb1f1cab4666061"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/jumbojett/OpenID-Connect-PHP/zipball/f69b40f755f6a38ce4c1be2e347aa3faa7c82d04",
-                "reference": "f69b40f755f6a38ce4c1be2e347aa3faa7c82d04",
+                "url": "https://api.github.com/repos/jumbojett/OpenID-Connect-PHP/zipball/45aac47b525f0483dd4db3324bb1f1cab4666061",
+                "reference": "45aac47b525f0483dd4db3324bb1f1cab4666061",
                 "shasum": ""
             },
             "require": {
@@ -44,9 +44,9 @@
             "description": "Bare-bones OpenID Connect client",
             "support": {
                 "issues": "https://github.com/jumbojett/OpenID-Connect-PHP/issues",
-                "source": "https://github.com/jumbojett/OpenID-Connect-PHP/tree/v0.9.9"
+                "source": "https://github.com/jumbojett/OpenID-Connect-PHP/tree/v0.9.10"
             },
-            "time": "2022-09-28T07:33:32+00:00"
+            "time": "2022-09-30T12:34:46+00:00"
         },
         {
             "name": "paragonie/constant_time_encoding",
