@@ -351,10 +351,18 @@ class Client extends OpenIDConnectClient {
 
 	/**
 	 * @codeCoverageIgnore
+	 * @throws OpenIDConnectClientException
 	 */
 	protected function fetchURL($url, $post_body = null, $headers = []) {
 		// TODO: see how to use ownCloud HttpClient ....
-		return parent::fetchURL($url, $post_body, $headers);
+		try {
+			return parent::fetchURL($url, $post_body, $headers);
+		} catch (\Exception $ex) {
+			$exception = \get_class($ex);
+			$msg = $ex->getMessage();
+			$this->logger->error("$exception accessing $url: $msg");
+			throw $ex;
+		}
 	}
 
 	/**
