@@ -28,9 +28,11 @@ use OC\User\LoginException;
 use OCP\Http\Client\IClientService;
 use OCP\IAvatarManager;
 use OCP\IGroupManager;
+use OCP\IL10N;
 use OCP\ILogger;
 use OCP\IUser;
 use OCP\IUserManager;
+use OCP\User\NotPermittedActionException;
 
 class AutoProvisioningService {
 
@@ -58,6 +60,10 @@ class AutoProvisioningService {
 	 * @var Client
 	 */
 	private $client;
+	/**
+	 * @var IL10N
+	 */
+	private $l10n;
 
 	public function __construct(
 		IUserManager $userManager,
@@ -65,7 +71,8 @@ class AutoProvisioningService {
 		IAvatarManager $avatarManager,
 		IClientService $clientService,
 		ILogger $logger,
-		Client $client
+		Client $client,
+		IL10N $l10n
 	) {
 		$this->userManager = $userManager;
 		$this->groupManager = $groupManager;
@@ -73,16 +80,22 @@ class AutoProvisioningService {
 		$this->logger = $logger;
 		$this->clientService = $clientService;
 		$this->client = $client;
+		$this->l10n = $l10n;
 	}
 
-	public function createUser($userInfo): IUser {
+	/**
+	 * @throws LoginException
+	 * @throws NotPermittedActionException
+	 * @throws \Exception
+	 */
+	public function createUser($userInfo): ?IUser {
 		if (!$this->autoProvisioningEnabled()) {
-			throw new LoginException('Auto provisioning is disabled.');
+			return null;
 		}
 		$attribute = $this->client->getIdentityClaim();
 		$emailOrUserId = $userInfo->$attribute ?? null;
 		if (!$emailOrUserId) {
-			throw new LoginException("Configured attribute $attribute is not known.");
+			throw new LoginException($this->l10n->t("OpenIdConnect: Configured attribute %s is not known.", [$attribute]));
 		}
 		$userId = $this->client->mode() === 'email' ? $this->generateUserId() : $emailOrUserId;
 
@@ -93,17 +106,17 @@ class AutoProvisioningService {
 			$provisioningAttribute = $config['provisioning-attribute'] ?? null;
 
 			if (!\property_exists($userInfo, $provisioningClaim) || !\is_array($userInfo->$provisioningClaim)) {
-				throw new LoginException('Required provisioning attribute is not found.');
+				throw new LoginException($this->l10n->t('OpenIdConnect: Required provisioning attribute is not found.'));
 			}
 
 			if (!\in_array($provisioningAttribute, $userInfo->$provisioningClaim, true)) {
-				throw new LoginException('Required provisioning attribute is not found.');
+				throw new LoginException($this->l10n->t('OpenIdConnect: Required provisioning attribute is not found.'));
 			}
 		}
 
 		$user = $this->userManager->createUser($userId, $this->generatePassword());
 		if (!$user) {
-			throw new LoginException("Unable to create user $userId");
+			throw new LoginException($this->l10n->t("OpenIdConnect: Unable to create user %s", $userId));
 		}
 		$user->setEnabled(true);
 
@@ -133,9 +146,12 @@ class AutoProvisioningService {
 		return $user;
 	}
 
-	public function updateAccountInfo(IUser $user, $userInfo, bool $force = false) {
+	/**
+	 * @throws NotPermittedActionException
+	 */
+	public function updateAccountInfo(IUser $user, $userInfo, bool $force = false): void {
 		if (!($this->autoUpdateEnabled() || $force)) {
-			throw new LoginException('Account auto-update is disabled.');
+			return;
 		}
 		if ($force || $user->canChangeMailAddress()) {
 			$currentEmail = $this->client->getUserEmail($userInfo);
@@ -155,21 +171,27 @@ class AutoProvisioningService {
 	}
 	
 	public function autoProvisioningEnabled(): bool {
-		return \boolval($this->client->getAutoProvisionConfig()['enabled'] ?? false);
+		return (bool)($this->client->getAutoProvisionConfig()['enabled'] ?? false);
 	}
 
 	public function autoUpdateEnabled(): bool {
-		return \boolval($this->client->getAutoUpdateConfig()['enabled'] ?? false);
+		return (bool)($this->client->getAutoUpdateConfig()['enabled'] ?? false);
 	}
 
 	protected function downloadPicture(string $pictureUrl): string {
 		return $this->clientService->newClient()->get($pictureUrl)->getBody();
 	}
 
+	/**
+	 * @throws \Exception
+	 */
 	private function generateUserId(): string {
 		return 'oidc-user-'.\bin2hex(\random_bytes(16));
 	}
 
+	/**
+	 * @throws \Exception
+	 */
 	private function generatePassword(): string {
 		return \bin2hex(\random_bytes(32));
 	}

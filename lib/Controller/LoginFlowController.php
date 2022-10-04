@@ -35,6 +35,7 @@ use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\Response;
 use OCP\ICacheFactory;
+use OCP\IL10N;
 use OCP\ILogger;
 use OCP\IRequest;
 use OCP\ISession;
@@ -71,7 +72,14 @@ class LoginFlowController extends Controller {
 	 * @var AutoProvisioningService
 	 */
 	private $autoProvisioningService;
+	/**
+	 * @var IL10N
+	 */
+	private $l10n;
 
+	/**
+	 * @throws \Exception
+	 */
 	public function __construct(
 		string $appName,
 		IRequest $request,
@@ -81,11 +89,12 @@ class LoginFlowController extends Controller {
 		ILogger $logger,
 		Client $client,
 		ICacheFactory $memCacheFactory,
-		AutoProvisioningService $autoProvisioningService
+		AutoProvisioningService $autoProvisioningService,
+		IL10N $l10n
 	) {
 		parent::__construct($appName, $request);
 		if (!$userSession instanceof Session) {
-			throw new \Exception('We rely on internal implementation!');
+			throw new \Exception('We rely on internal session implementation!');
 		}
 
 		$this->session = $session;
@@ -95,6 +104,7 @@ class LoginFlowController extends Controller {
 		$this->logger = new Logger($logger);
 		$this->memCacheFactory = $memCacheFactory;
 		$this->autoProvisioningService = $autoProvisioningService;
+		$this->l10n = $l10n;
 	}
 
 	/**
@@ -118,8 +128,11 @@ class LoginFlowController extends Controller {
 	 * @PublicPage
 	 * @UseSession
 	 *
+	 * @return RedirectResponse
 	 * @throws HintException
 	 * @throws LoginException
+	 * @throws OpenIDConnectClientException
+	 * @throws \JsonException
 	 */
 	public function login(): RedirectResponse {
 		$this->logger->debug('Entering LoginFlowController::login');
@@ -140,19 +153,16 @@ class LoginFlowController extends Controller {
 			'refresh_token' => $openid->getRefreshToken(),
 			'id_token' => $openid->getIdToken(),
 			'access_token_payload' => $openid->getAccessTokenPayload(),
-		], JSON_PRETTY_PRINT);
+		], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT);
 		$this->logger->debug('LoginFlowController::login : Token info: ' . $debugInfo);
 
 		$userInfo = $openid->getUserInfo();
-		$this->logger->debug('User info: ' . \json_encode($userInfo));
+		$this->logger->debug('User info: ' . \json_encode($userInfo, JSON_THROW_ON_ERROR));
 		if (!$userInfo) {
-			throw new LoginException('No user information available.');
+			throw new LoginException($this->l10n->t('OpenIdConnect: No user information available.'));
 		}
 		$user = $this->userLookup->lookupUser($userInfo);
-
-		if ($this->autoProvisioningService->autoUpdateEnabled()) {
-			$this->autoProvisioningService->updateAccountInfo($user, $userInfo);
-		}
+		$this->autoProvisioningService->updateAccountInfo($user, $userInfo);
 
 		// trigger login process
 		if ($this->userSession->createSessionToken($this->request, $user->getUID(), $user->getUID()) &&

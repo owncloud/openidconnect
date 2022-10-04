@@ -32,6 +32,7 @@ use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\ICacheFactory;
 use OCP\IConfig;
+use OCP\IL10N;
 use OCP\ILogger;
 use OCP\IRequest;
 use OCP\ISession;
@@ -82,6 +83,11 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 			->onlyMethods(['getUserInfo', 'refreshToken', 'signOut', 'getOpenIdConfig', 'verifyJWTsignature', 'getAccessTokenPayload', 'setAccessToken', 'introspectToken', 'getAutoProvisionConfig'])
 			->setConstructorArgs([$config, $generator, $session, $this->logger])
 			->getMock();
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')
+			->willReturnCallback(function ($text, $parameters = []) {
+				return \vsprintf($text, $parameters);
+			});
 
 		$this->autoProvisioningService = $this->createMock(AutoProvisioningService::class);
 		$this->authModule = new OpenIdConnectAuthModule(
@@ -90,7 +96,8 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 			$this->cacheFactory,
 			$this->lookupService,
 			$this->client,
-			$this->autoProvisioningService
+			$this->autoProvisioningService,
+			$l10n
 		);
 	}
 
@@ -198,7 +205,7 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 
 	public function testExpiredCachedToken(): void {
 		$this->expectException(LoginException::class);
-		$this->expectExceptionMessage('OpenID Connect token expired');
+		$this->expectExceptionMessage('OpenIdConnect: token expired');
 
 		$cache = new ArrayCache();
 		$cache->set(1234567890, ['exp' => \time() - 5]);
@@ -229,7 +236,7 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		$this->lookupService->expects(self::once())->method('lookupUser')->willReturn($user);
 		$request = $this->createMock(IRequest::class);
 		$request->method('getHeader')->willReturn('Bearer 1234567890');
-		$this->autoProvisioningService->expects(self::once())->method('updateAccountInfo')->with($user, $userInfo)->willReturn(null);
+		$this->autoProvisioningService->expects(self::once())->method('updateAccountInfo')->with($user, $userInfo);
 		$this->authModule->auth($request);
 	}
 }

@@ -29,6 +29,7 @@ use OCA\OpenIdConnect\Controller\LoginFlowController;
 use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\ICacheFactory;
+use OCP\IL10N;
 use OCP\ILogger;
 use OCP\IRequest;
 use OCP\ISession;
@@ -84,6 +85,7 @@ class LoginFlowControllerLogoutTest extends TestCase {
 		$this->client = $this->createMock(Client::class);
 		$this->memCacheFactory = $this->createMock(ICacheFactory::class);
 		$this->autoProvisioningService = $this->createMock(AutoProvisioningService::class);
+		$l10n = $this->createMock(IL10N::class);
 
 		$this->controller = new LoginFlowController(
 			'openidconnect',
@@ -94,7 +96,8 @@ class LoginFlowControllerLogoutTest extends TestCase {
 			$this->logger,
 			$this->client,
 			$this->memCacheFactory,
-			$this->autoProvisioningService
+			$this->autoProvisioningService,
+			$l10n
 		);
 	}
 
