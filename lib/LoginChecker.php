@@ -22,17 +22,25 @@
 namespace OCA\OpenIdConnect;
 
 use OCP\IL10N;
+use OCP\IGroupManager;
+use OCP\IConfig;
 use OC\Helper\UserTypeHelper;
 use OC\User\LoginException;
 
 class LoginChecker {
 	/** @var UserTypeHelper */
 	private $userTypeHelper;
+	/** @var IGroupManager */
+	private $groupManager;
+	/** @var IConfig */
+	private $config;
 	/** @var IL10N*/
 	private $l10n;
 
-	public function __construct(UserTypeHelper $userTypeHelper, IL10N $l10n) {
+	public function __construct(UserTypeHelper $userTypeHelper, IGroupManager $groupManager, IConfig $config, IL10N $l10n) {
 		$this->userTypeHelper = $userTypeHelper;
+		$this->groupManager = $groupManager;
+		$this->config = $config;
 		$this->l10n = $l10n;
 	}
 
@@ -41,8 +49,27 @@ class LoginChecker {
 	 * @throws LoginException if the uid isn't a guest
 	 */
 	public function ensurePasswordLoginJustForGuest($loginType, $uid) {
-		if (!$this->userTypeHelper->isGuestUser($uid) && $loginType === 'password') {
-			throw new LoginException($this->l10n->t('Only guests are allowed through this authentication mechanism'));
+		if ($loginType !== 'password') {
+			// if login type isn't password, there is nothing to do
+			return;
 		}
+
+		$excludedGroupsIds = $this->config->getSystemValue('openid-connect.basic_auth_guest_only.exclude_groups', []);
+		if (!\is_array($excludedGroupsIds)) {
+			$excludedGroupsIds = [];
+		}
+
+		if (!$this->userTypeHelper->isGuestUser($uid) && !$this->isInGroupList($uid, $excludedGroupsIds)) {
+			throw new LoginException($this->l10n->t('You are not allowed to login through this authentication mechanism'));
+		}
+	}
+
+	private function isInGroupList($uid, $groupIds) {
+		foreach ($groupIds as $groupId) {
+			if ($this->groupManager->isInGroup($uid, $groupId)) {
+				return true;
+			}
+		}
+		return false;
 	}
 }
