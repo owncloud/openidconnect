@@ -24,6 +24,8 @@ namespace OCA\OpenIdConnect\Tests\Unit;
 
 use OCA\OpenIdConnect\LoginChecker;
 use OCP\IL10N;
+use OCP\IGroupManager;
+use OCP\IConfig;
 use OC\Helper\UserTypeHelper;
 use OC\User\LoginException;
 use Test\TestCase;
@@ -31,6 +33,10 @@ use Test\TestCase;
 class LoginCheckerTest extends TestCase {
 	/** @var UserTypeHelper */
 	private $userTypeHelper;
+	/** @var IGroupManager */
+	private $groupManager;
+	/** @var IConfig */
+	private $config;
 	/** @var IL10N */
 	private $l10n;
 	/** @var LoginChecker */
@@ -39,9 +45,11 @@ class LoginCheckerTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 		$this->userTypeHelper = $this->createMock(UserTypeHelper::class);
+		$this->groupManager = $this->createMock(IGroupManager::class);
+		$this->config = $this->createMock(IConfig::class);
 		$this->l10n = $this->createMock(IL10N::class);
 
-		$this->loginChecker = new LoginChecker($this->userTypeHelper, $this->l10n);
+		$this->loginChecker = new LoginChecker($this->userTypeHelper, $this->groupManager, $this->config, $this->l10n);
 	}
 
 	public function ensurePasswordLoginJustForGuestDataProvider() {
@@ -60,8 +68,11 @@ class LoginCheckerTest extends TestCase {
 	 * @dataProvider ensurePasswordLoginJustForGuestDataProvider
 	 */
 	public function testEnsurePasswordLoginJustForGuest($isGuest, $loginType) {
-		$this->userTypeHelper->expects($this->once())
-			->method('isGuestUser')
+		$this->config->method('getSystemValue')
+			->with('openid-connect.basic_auth_guest_only.exclude_groups', [])
+			->willReturn([]);
+
+		$this->userTypeHelper->method('isGuestUser')
 			->willReturn($isGuest);
 		$this->assertNull($this->loginChecker->ensurePasswordLoginJustForGuest($loginType, 'myUser'));
 	}
@@ -69,7 +80,21 @@ class LoginCheckerTest extends TestCase {
 	public function testEnsurePasswordLoginJustForGuestNotGuest() {
 		$this->expectException(LoginException::class);
 
+		$this->config->method('getSystemValue')
+			->with('openid-connect.basic_auth_guest_only.exclude_groups', [])
+			->willReturn([]);
 		$this->userTypeHelper->method('isGuestUser')->willReturn(false);
 		$this->loginChecker->ensurePasswordLoginJustForGuest('password', 'muUser');
+	}
+
+	public function testEnsurePasswordLoginJustForGuestNotGuestButInGroup() {
+		$this->config->method('getSystemValue')
+			->with('openid-connect.basic_auth_guest_only.exclude_groups', [])
+			->willReturn(['myAdminGroup']);
+		$this->groupManager->method('isInGroup')
+			->with('muUser', 'myAdminGroup')
+			->willReturn(true);
+		$this->userTypeHelper->method('isGuestUser')->willReturn(false);
+		$this->assertNull($this->loginChecker->ensurePasswordLoginJustForGuest('password', 'muUser'));
 	}
 }
