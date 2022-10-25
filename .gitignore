@@ -18,3 +18,5 @@ l10n/l10n.pl
 
 # Generated from .drone.star
 .drone.yml
+
+.idea/
