@@ -1,6 +1,6 @@
 BANST_AWS_CLI = "banst/awscli"
 DRONE_CLI = "drone/cli:alpine"
-MAILHOG_MAILHOG = "mailhog/mailhog"
+INBUCKET_INBUCKET = "inbucket/inbucket"
 MINIO_MC = "minio/mc:RELEASE.2020-12-18T10-53-53Z"
 OC_CI_ALPINE = "owncloudci/alpine:latest"
 OC_CI_BAZEL_BUILDIFIER = "owncloudci/bazel-buildifier"
@@ -1432,7 +1432,7 @@ def emailService(emailNeeded):
     if emailNeeded:
         return [{
             "name": "email",
-            "image": MAILHOG_MAILHOG,
+            "image": INBUCKET_INBUCKET,
         }]
 
     return []
@@ -1443,7 +1443,7 @@ def waitForEmailService(emailNeeded):
             "name": "wait-for-email",
             "image": OC_CI_WAIT_FOR,
             "commands": [
-                "wait-for -it email:8025 -t 600",
+                "wait-for -it email:9000 -t 600",
             ],
         }]
 
