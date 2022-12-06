@@ -49,7 +49,14 @@ config = {
     "codestyle": True,
     "javascript": False,
     "phpstan": True,
-    "phan": True,
+    "phan": {
+        "multipleVersions": {
+            "phpVersions": [
+                DEFAULT_PHP_VERSION,
+                "7.3",
+            ],
+        },
+    },
     "build": {
         "commands": [
             "make dist",
