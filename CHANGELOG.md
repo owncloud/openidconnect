@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 - [#243](https://github.com/owncloud/openidconnect/pull/243) - feat: JWT token will always be used for user info, expiry and verification
 - [#253](https://github.com/owncloud/openidconnect/pull/253) - Add config option to allow basic auth only for guests
 - [#257](https://github.com/owncloud/openidconnect/pull/257) - feat: add translations support
+- [#272](https://github.com/owncloud/openidconnect/pull/272) - Send to auth module so the login type is recognized in core
 
 
 ## [2.1.1] - 2022-02-25
