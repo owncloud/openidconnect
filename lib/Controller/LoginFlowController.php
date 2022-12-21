@@ -157,6 +157,7 @@ class LoginFlowController extends Controller {
 
 		// trigger login process
 		if ($this->userSession->createSessionToken($this->request, $user->getUID(), $user->getUID()) &&
+			// @phpstan-ignore-next-line because loginUser does not have the third argument in older versions
 			$this->userSession->loginUser($user, null, OpenIdConnectAuthModule::class)) {
 			$this->session->set('oca.openid-connect.id-token', $openid->getIdToken());
 			$this->session->set('oca.openid-connect.access-token', $openid->getAccessToken());
