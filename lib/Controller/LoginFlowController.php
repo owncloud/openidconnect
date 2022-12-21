@@ -28,6 +28,7 @@ use OC\User\LoginException;
 use OC\User\Session;
 use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\Logger;
+use OCA\OpenIdConnect\OpenIdConnectAuthModule;
 use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\AppFramework\Controller;
@@ -156,7 +157,8 @@ class LoginFlowController extends Controller {
 
 		// trigger login process
 		if ($this->userSession->createSessionToken($this->request, $user->getUID(), $user->getUID()) &&
-			$this->userSession->loginUser($user, null)) {
+			// @phpstan-ignore-next-line because loginUser does not have the third argument in older versions
+			$this->userSession->loginUser($user, null, OpenIdConnectAuthModule::class)) {
 			$this->session->set('oca.openid-connect.id-token', $openid->getIdToken());
 			$this->session->set('oca.openid-connect.access-token', $openid->getAccessToken());
 			$this->session->set('oca.openid-connect.refresh-token', $openid->getRefreshToken());

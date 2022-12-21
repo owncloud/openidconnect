@@ -35,7 +35,7 @@ The _key->value_ pairs are the same as when storing them to the `config.php` fil
 
 ```
 occ config:app:set openidconnect openid-connect \
---value='{"provider-url":"https:\/\/idp.example.net","client-id":"fc9b5c78-ec73-47bf-befc-59d4fe780f6f","client-secret":"e3e5b04a-3c3c-4f4d-b16c-2a6e9fdd3cd1","loginButtonName":"Login via OpenId Connect"}'
+--value='{"provider-url":"https://idp.example.net","client-id":"fc9b5c78-ec73-47bf-befc-59d4fe780f6f","client-secret":"e3e5b04a-3c3c-4f4d-b16c-2a6e9fdd3cd1","loginButtonName":"Login via OpenId Connect"}'
 ```
 
 This task can also be done by opening the database console for your ownCloud database and enter the following example command. Use the database commands `UPDATE` or `DELETE` to change or delete this keys (not recommended).
@@ -48,7 +48,7 @@ INSERT INTO oc_appconfig (
 ) VALUES (
   'openidconnect',
   'openid-connect',
-  '{"provider-url":"https:\/\/idp.example.net","client-id":"fc9b5c78-ec73-47bf-befc-59d4fe780f6f","client-secret":"e3e5b04a-3c3c-4f4d-b16c-2a6e9fdd3cd1","loginButtonName":"Login via OpenId Connect"}'
+  '{"provider-url":"https://idp.example.net","client-id":"fc9b5c78-ec73-47bf-befc-59d4fe780f6f","client-secret":"e3e5b04a-3c3c-4f4d-b16c-2a6e9fdd3cd1","loginButtonName":"Login via OpenId Connect"}'
 );
 ```
 
