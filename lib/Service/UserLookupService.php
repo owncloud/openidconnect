@@ -24,8 +24,13 @@ namespace OCA\OpenIdConnect\Service;
 use OC\HintException;
 use OC\User\LoginException;
 use OCA\OpenIdConnect\Client;
+use OCA\OpenIdConnect\Logger;
+use OCP\IL10N;
+use OCP\ILogger;
 use OCP\IUser;
 use OCP\IUserManager;
+use OCP\User\NotPermittedActionException;
+use function property_exists;
 
 class UserLookupService {
 
@@ -41,15 +46,27 @@ class UserLookupService {
 	 * @var AutoProvisioningService
 	 */
 	private $autoProvisioningService;
+	/**
+	 * @var IL10N
+	 */
+	private $l10N;
+	/**
+	 * @var ILogger
+	 */
+	private $logger;
 
 	public function __construct(
 		IUserManager $userManager,
 		Client $client,
-		AutoProvisioningService $autoProvisioningService
+		AutoProvisioningService $autoProvisioningService,
+		IL10N $l0N,
+		ILogger $logger
 	) {
 		$this->userManager = $userManager;
 		$this->client = $client;
 		$this->autoProvisioningService = $autoProvisioningService;
+		$this->l10N = $l0N;
+		$this->logger = new Logger($logger);
 	}
 
 	/**
@@ -57,47 +74,52 @@ class UserLookupService {
 	 * @return IUser
 	 * @throws LoginException
 	 * @throws HintException
+	 * @throws NotPermittedActionException
 	 */
 	public function lookupUser($userInfo): IUser {
 		$openIdConfig = $this->client->getOpenIdConfig();
 		if ($openIdConfig === null) {
-			throw new HintException('Configuration issue in openidconnect app');
+			throw new HintException($this->l10N->t('OpenIdConnect: Missing configuration'));
 		}
 		$searchByEmail = true;
 		if ($this->client->mode() === 'userid') {
 			$searchByEmail = false;
 		}
 		$attribute = $this->client->getIdentityClaim();
-		if (!\property_exists($userInfo, $attribute)) {
-			throw new LoginException("Configured attribute $attribute is not known.");
+		if (!property_exists($userInfo, $attribute)) {
+			throw new LoginException($this->l10N->t("OpenIdConnect: Configured attribute %s is not known.", [$attribute]));
 		}
 
 		if ($searchByEmail) {
 			$user = $this->userManager->getByEmail($userInfo->$attribute);
 			if (!$user) {
-				if ($this->autoProvisioningService->autoProvisioningEnabled()) {
-					return $this->autoProvisioningService->createUser($userInfo);
+				$user = $this->autoProvisioningService->createUser($userInfo);
+				if ($user) {
+					return $user;
 				}
 
-				throw new LoginException("User with {$userInfo->$attribute} is not known.");
+				throw new LoginException($this->l10N->t("OpenIdConnect: User with %s is not known.", [$userInfo->$attribute]));
 			}
 			if (\count($user) !== 1) {
-				throw new LoginException("{$userInfo->$attribute} is not unique.");
+				throw new LoginException($this->l10N->t("OpenIdConnect: %s is not unique.", [$userInfo->$attribute]));
 			}
 			$this->validUser($user[0]);
 			return $user[0];
 		}
 		$user = $this->userManager->get($userInfo->$attribute);
 		if (!$user) {
-			if ($this->autoProvisioningService->autoProvisioningEnabled()) {
-				return $this->autoProvisioningService->createUser($userInfo);
+			$user = $this->autoProvisioningService->createUser($userInfo);
+			if (!$user) {
+				throw new LoginException($this->l10N->t("OpenIdConnect: User %s is not known.", [$userInfo->$attribute]));
 			}
-			throw new LoginException("User {$userInfo->$attribute} is not known.");
 		}
 		$this->validUser($user);
 		return $user;
 	}
 
+	/**
+	 * @throws LoginException
+	 */
 	private function validUser(IUser $user): void {
 		$openIdConfig = $this->client->getOpenIdConfig();
 		$allowedUserBackEnds = $openIdConfig['allowed-user-backends'] ?? null;
@@ -107,6 +129,8 @@ class UserLookupService {
 		if (\in_array($user->getBackendClassName(), $allowedUserBackEnds, true)) {
 			return;
 		}
-		throw new LoginException("User is from wrong user backend <{$user->getBackendClassName()}>");
+
+		$this->logger->error("User <{$user->getUID()}> is from wrong user backend <{$user->getBackendClassName()}>");
+		throw new LoginException($this->l10N->t("OpenIdConnect: login denied."));
 	}
 }

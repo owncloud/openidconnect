@@ -27,8 +27,11 @@ use OC\User\LoginException;
 use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
+use OCP\IL10N;
+use OCP\ILogger;
 use OCP\IUser;
 use OCP\IUserManager;
+use OCP\User\NotPermittedActionException;
 use PHPUnit\Framework\MockObject\MockObject;
 use Test\TestCase;
 
@@ -46,27 +49,43 @@ class UserLookupServiceTest extends TestCase {
 	 * @var MockObject | IUserManager
 	 */
 	private $manager;
-	/**
-	 * @var AutoProvisioningService|MockObject
-	 */
-	private $autoProvisioningService;
 
 	protected function setUp(): void {
 		parent::setUp();
 		$this->client = $this->createMock(Client::class);
 		$this->manager = $this->createMock(IUserManager::class);
-		$this->autoProvisioningService = $this->createMock(AutoProvisioningService::class);
+		$autoProvisioningService = $this->createMock(AutoProvisioningService::class);
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')
+			->willReturnCallback(function ($text, $parameters = []) {
+				return \vsprintf($text, $parameters);
+			});
+		$logger = $this->createMock(ILogger::class);
 
-		$this->userLookup = new UserLookupService($this->manager, $this->client, $this->autoProvisioningService);
+		$this->userLookup = new UserLookupService(
+			$this->manager,
+			$this->client,
+			$autoProvisioningService,
+			$l10n,
+			$logger
+		);
 	}
 
+	/**
+	 * @throws LoginException
+	 * @throws NotPermittedActionException
+	 */
 	public function testNotConfigured(): void {
 		$this->expectException(HintException::class);
-		$this->expectExceptionMessage('Configuration issue in openidconnect app');
+		$this->expectExceptionMessage('OpenIdConnect: Missing configuration');
 
 		$this->userLookup->lookupUser(null);
 	}
 
+	/**
+	 * @throws HintException
+	 * @throws NotPermittedActionException
+	 */
 	public function testLookupByEMailNotFound(): void {
 		$this->expectException(LoginException::class);
 		$this->expectExceptionMessage('User with foo@example.com is not known.');
@@ -76,6 +95,10 @@ class UserLookupServiceTest extends TestCase {
 		$this->userLookup->lookupUser((object)['email' => 'foo@example.com']);
 	}
 
+	/**
+	 * @throws HintException
+	 * @throws NotPermittedActionException
+	 */
 	public function testLookupByEMailNotUnique(): void {
 		$this->expectException(LoginException::class);
 		$this->expectExceptionMessage('foo@example.com is not unique.');
@@ -86,6 +109,11 @@ class UserLookupServiceTest extends TestCase {
 		$this->userLookup->lookupUser((object)['email' => 'foo@example.com']);
 	}
 
+	/**
+	 * @throws LoginException
+	 * @throws HintException
+	 * @throws NotPermittedActionException
+	 */
 	public function testLookupByEMail(): void {
 		$this->client->method('getOpenIdConfig')->willReturn([]);
 		$this->client->method('mode')->willReturn('email');
@@ -96,6 +124,10 @@ class UserLookupServiceTest extends TestCase {
 		self::assertEquals($user, $return);
 	}
 
+	/**
+	 * @throws HintException
+	 * @throws NotPermittedActionException
+	 */
 	public function testLookupByUserIdNotFound(): void {
 		$this->expectException(LoginException::class);
 		$this->expectExceptionMessage('User alice is not known.');
@@ -105,6 +137,11 @@ class UserLookupServiceTest extends TestCase {
 		$this->userLookup->lookupUser((object)['preferred_username' => 'alice']);
 	}
 
+	/**
+	 * @throws LoginException
+	 * @throws HintException
+	 * @throws NotPermittedActionException
+	 */
 	public function testLookupByUserId(): void {
 		$this->client->method('getOpenIdConfig')->willReturn(['mode' => 'userid', 'search-attribute' => 'preferred_username']);
 		$this->client->method('mode')->willReturn('userid');
@@ -115,6 +152,10 @@ class UserLookupServiceTest extends TestCase {
 		self::assertEquals($user, $return);
 	}
 
+	/**
+	 * @throws HintException
+	 * @throws NotPermittedActionException
+	 */
 	public function testInvalidUserBackEnd(): void {
 		$this->client->method('getOpenIdConfig')->willReturn(['mode' => 'userid', 'search-attribute' => 'preferred_username', 'allowed-user-backends' => ['LDAP']]);
 		$this->client->method('getIdentityClaim')->willReturn('preferred_username');
@@ -127,6 +168,11 @@ class UserLookupServiceTest extends TestCase {
 		$this->userLookup->lookupUser((object)['preferred_username' => 'alice']);
 	}
 
+	/**
+	 * @throws LoginException
+	 * @throws HintException
+	 * @throws NotPermittedActionException
+	 */
 	public function testValidUserBackEnd(): void {
 		$this->client->method('getOpenIdConfig')->willReturn(['allowed-user-backends' => ['LDAP']]);
 		$this->client->method('getIdentityClaim')->willReturn('preferred_username');

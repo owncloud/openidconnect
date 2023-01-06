@@ -29,13 +29,14 @@ use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\Authentication\IAuthModule;
 use OCP\ICache;
 use OCP\ICacheFactory;
+use OCP\IL10N;
 use OCP\ILogger;
 use OCP\IRequest;
 use OCP\IUser;
 use OCP\IUserManager;
 
 /**
- * Class OpenIdConnectAuthModule - used in case ownCloud acts as relying party.
+ * Class OpenIdConnectAuthModule - used in case ownCloud acts as relying-party.
  * Mobile clients, desktop clients and phoenix will send an access token which
  * has been issued by the connected OpenID Connect Provider
  *
@@ -55,6 +56,8 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	private $lookupService;
 	/** @var AutoProvisioningService */
 	private $autoProvisioningService;
+	/** @var IL10N */
+	private $l10n;
 
 	/**
 	 * OpenIdConnectAuthModule constructor.
@@ -65,6 +68,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	 * @param UserLookupService $lookupService
 	 * @param Client $client
 	 * @param AutoProvisioningService $autoProvisioningService
+	 * @param IL10N $l10n
 	 */
 	public function __construct(
 		IUserManager $manager,
@@ -72,7 +76,8 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		ICacheFactory $cacheFactory,
 		UserLookupService $lookupService,
 		Client $client,
-		AutoProvisioningService $autoProvisioningService
+		AutoProvisioningService $autoProvisioningService,
+		IL10N $l10n
 	) {
 		$this->manager = $manager;
 		$this->logger = new Logger($logger);
@@ -80,12 +85,14 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		$this->client = $client;
 		$this->lookupService = $lookupService;
 		$this->autoProvisioningService = $autoProvisioningService;
+		$this->l10n = $l10n;
 	}
 
 	/**
 	 * @param IRequest $request
 	 * @return IUser|null
 	 * @throws LoginException
+	 * @throws \JsonException
 	 */
 	public function auth(IRequest $request): ?IUser {
 		$authHeader = $request->getHeader('Authorization');
@@ -105,6 +112,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 
 	/**
 	 * @throws LoginException
+	 * @throws \JsonException
 	 */
 	public function authToken(string $type, string $token): ?IUser {
 		$this->logger->debug("OpenIdConnectAuthModule::authToken $type $token");
@@ -120,7 +128,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 				$expiring = $expiry - \time();
 				if ($expiring < 0) {
 					$this->logger->debug("OpenID Connect token expired at $expiry");
-					throw new LoginException('OpenID Connect token expired');
+					throw new LoginException($this->l10n->t('OpenIdConnect: token expired.'));
 				}
 			}
 
@@ -149,6 +157,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 
 	/**
 	 * @throws OpenIDConnectClientException
+	 * @throws \JsonException
 	 */
 	private function verifyToken(string $token) {
 		$cache = $this->getCache();
@@ -172,21 +181,19 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		$cache = $this->getCache();
 		$userInfo = $cache->get($bearerToken);
 		if ($userInfo) {
-			$this->logger->debug('OpenIdConnectAuthModule::getUserResource from cache: ' . \json_encode($userInfo));
+			$this->logger->debug('OpenIdConnectAuthModule::getUserResource from cache: ' . \json_encode($userInfo, JSON_THROW_ON_ERROR));
 			return $this->manager->get($userInfo['uid']);
 		}
 
 		$this->client->setAccessToken($bearerToken);
 		$userInfo = $this->client->getUserInfo();
-		$this->logger->debug('OpenIdConnectAuthModule::getUserResource from cache: ' . \json_encode($userInfo));
+		$this->logger->debug('OpenIdConnectAuthModule::getUserResource from cache: ' . \json_encode($userInfo, JSON_THROW_ON_ERROR));
 		if ($userInfo === null) {
 			return null;
 		}
 		$user = $this->lookupService->lookupUser($userInfo);
 
-		if ($this->autoProvisioningService->autoUpdateEnabled()) {
-			$this->autoProvisioningService->updateAccountInfo($user, $userInfo);
-		}
+		$this->autoProvisioningService->updateAccountInfo($user, $userInfo);
 
 		return $user;
 	}

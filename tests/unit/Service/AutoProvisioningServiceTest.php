@@ -33,9 +33,11 @@ use OCP\IAvatar;
 use OCP\IAvatarManager;
 use OCP\IGroup;
 use OCP\IGroupManager;
+use OCP\IL10N;
 use OCP\ILogger;
 use OCP\IUser;
 use OCP\IUserManager;
+use OCP\User\NotPermittedActionException;
 use PHPUnit\Framework\MockObject\MockObject;
 use Test\TestCase;
 
@@ -74,6 +76,7 @@ class AutoProvisioningServiceTest extends TestCase {
 		$this->clientService = $this->createMock(IClientService::class);
 		$logger = $this->createMock(ILogger::class);
 		$this->client = $this->createMock(Client::class);
+		$l10n = $this->createMock(IL10N::class);
 
 		$this->autoProvisioningService = new AutoProvisioningService(
 			$this->userManager,
@@ -82,6 +85,7 @@ class AutoProvisioningServiceTest extends TestCase {
 			$this->clientService,
 			$logger,
 			$this->client,
+			$l10n,
 		);
 	}
 
@@ -114,7 +118,7 @@ class AutoProvisioningServiceTest extends TestCase {
 	 * @param bool $expectsGroupMembership
 	 * @param array $config
 	 * @param object $userInfo
-	 * @throws LoginException
+	 * @throws LoginException|NotPermittedActionException
 	 */
 	public function testCreateUser(
 		bool $expectsUserToBeCreated,
@@ -163,10 +167,13 @@ class AutoProvisioningServiceTest extends TestCase {
 				$group->expects(self::once())->method('addUser');
 				$this->groupManager->expects(self::once())->method('get')->with('oidc-group')->willReturn($group);
 			}
-		} else {
-			$this->expectException(LoginException::class);
 		}
-		$this->autoProvisioningService->createUser($userInfo);
+		$user = $this->autoProvisioningService->createUser($userInfo);
+		if ($expectsUserToBeCreated) {
+			self::assertNotNull($user);
+		} else {
+			self::assertNull($user);
+		}
 	}
 
 	/**
@@ -205,6 +212,7 @@ class AutoProvisioningServiceTest extends TestCase {
 	 * @param array $config
 	 * @param array $userInfo
 	 * @return void
+	 * @throws NotPermittedActionException
 	 */
 	public function testAutoUpdate(
 		bool $expectException,
@@ -268,7 +276,7 @@ class AutoProvisioningServiceTest extends TestCase {
 	public function providesAttributeUpdates(): array {
 		return [
 			# 1. update disabled, not forced
-			[true, false, false, false, false, false, '', '', [], ['email' => 'alice@example.net']],
+			[false, false, false, false, false, false, '', '', [], ['email' => 'alice@example.net']],
 			# 2. update disabled by config, but forced on a newly provisioned account
 			[false, true, true, true, false, false, '', '', ['auto-provision' => ['enabled' => false, 'update' => ['enabled' => false], 'email-claim' => 'email', 'display-name-claim' => 'name']], ['email' => 'alice@example.net', 'name' => 'John']],
 			# 3. update enabled, but missing claims in configuration
