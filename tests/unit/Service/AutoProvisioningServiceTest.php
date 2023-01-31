@@ -36,7 +36,10 @@ use OCP\IGroupManager;
 use OCP\ILogger;
 use OCP\IUser;
 use OCP\IUserManager;
+use OCP\Security\ISecureRandom;
+use OCP\User\NotPermittedActionException;
 use PHPUnit\Framework\MockObject\MockObject;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 use Test\TestCase;
 
 class AutoProvisioningServiceTest extends TestCase {
@@ -74,6 +77,9 @@ class AutoProvisioningServiceTest extends TestCase {
 		$this->clientService = $this->createMock(IClientService::class);
 		$logger = $this->createMock(ILogger::class);
 		$this->client = $this->createMock(Client::class);
+		$secureRandom = $this->createMock(ISecureRandom::class);
+		$secureRandom->method('generate')->willReturn('123456890');
+		$dispatcher = $this->createMock(EventDispatcher::class);
 
 		$this->autoProvisioningService = new AutoProvisioningService(
 			$this->userManager,
@@ -82,6 +88,8 @@ class AutoProvisioningServiceTest extends TestCase {
 			$this->clientService,
 			$logger,
 			$this->client,
+			$dispatcher,
+			$secureRandom
 		);
 	}
 
@@ -115,6 +123,7 @@ class AutoProvisioningServiceTest extends TestCase {
 	 * @param array $config
 	 * @param object $userInfo
 	 * @throws LoginException
+	 * @throws NotPermittedActionException
 	 */
 	public function testCreateUser(
 		bool $expectsUserToBeCreated,
@@ -205,6 +214,7 @@ class AutoProvisioningServiceTest extends TestCase {
 	 * @param array $config
 	 * @param array $userInfo
 	 * @return void
+	 * @throws NotPermittedActionException
 	 */
 	public function testAutoUpdate(
 		bool $expectException,
@@ -253,7 +263,8 @@ class AutoProvisioningServiceTest extends TestCase {
 			[false, false, false, false, false, ['auto-provision' => ['enabled' => true]], (object)[]],
 			[true, false, false, false, false, ['auto-provision' => ['enabled' => true]], (object)['email' => 'alice@example.net']],
 			[true, true, false, false, false, ['auto-provision' => ['enabled' => true, 'email-claim' => 'email']], (object)['email' => 'alice@example.net']],
-			[true, true, false, false, false, ['mode' => 'email', 'auto-provision' => ['enabled' => true]], (object)['email' => 'alice@example.net']],
+			# email mode shall not update the users email
+			[true, false, false, false, false, ['mode' => 'email', 'auto-provision' => ['enabled' => true]], (object)['email' => 'alice@example.net']],
 			[true, false, true, false, false, ['mode' => 'userid', 'auto-provision' => ['enabled' => true, 'display-name-claim' => 'name']], (object)['email' => 'alice@example.net', 'name' => 'Alice']],
 			[true, false, false, true, false, ['mode' => 'userid', 'auto-provision' => ['enabled' => true, 'picture-claim' => 'picture']], (object)['email' => 'alice@example.net', 'picture' => 'http://']],
 			[true, false, false, false, true, ['mode' => 'userid', 'auto-provision' => ['enabled' => true, 'groups' => ['oidc-group']]], (object)['email' => 'alice@example.net', 'picture' => 'http://']],
