@@ -21,6 +21,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+
 namespace OCA\OpenIdConnect\Service;
 
 use OCA\OpenIdConnect\Client;
@@ -31,6 +32,10 @@ use OCP\IGroupManager;
 use OCP\ILogger;
 use OCP\IUser;
 use OCP\IUserManager;
+use OCP\Security\ISecureRandom;
+use OCP\User\NotPermittedActionException;
+use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\EventDispatcher\GenericEvent;
 
 class AutoProvisioningService {
 
@@ -58,23 +63,40 @@ class AutoProvisioningService {
 	 * @var Client
 	 */
 	private $client;
+	/**
+	 * @var EventDispatcher
+	 */
+	private $eventDispatcher;
+	/**
+	 * @var ISecureRandom
+	 */
+	private $secureRandom;
 
 	public function __construct(
-		IUserManager $userManager,
-		IGroupManager $groupManager,
-		IAvatarManager $avatarManager,
-		IClientService $clientService,
-		ILogger $logger,
-		Client $client
+		IUserManager    $userManager,
+		IGroupManager   $groupManager,
+		IAvatarManager  $avatarManager,
+		IClientService  $clientService,
+		ILogger         $logger,
+		Client          $client,
+		EventDispatcher $eventDispatcher,
+		ISecureRandom   $secureRandom
 	) {
 		$this->userManager = $userManager;
 		$this->groupManager = $groupManager;
 		$this->avatarManager = $avatarManager;
-		$this->logger = $logger;
 		$this->clientService = $clientService;
+		$this->logger = $logger;
 		$this->client = $client;
+		$this->eventDispatcher = $eventDispatcher;
+		$this->secureRandom = $secureRandom;
 	}
 
+	/**
+	 * @throws LoginException
+	 * @throws NotPermittedActionException
+	 * @throws \Exception
+	 */
 	public function createUser($userInfo): IUser {
 		if (!$this->autoProvisioningEnabled()) {
 			throw new LoginException('Auto provisioning is disabled.');
@@ -133,15 +155,22 @@ class AutoProvisioningService {
 		return $user;
 	}
 
-	public function updateAccountInfo(IUser $user, $userInfo, bool $force = false) {
+	/**
+	 * @throws LoginException
+	 * @throws NotPermittedActionException
+	 */
+	public function updateAccountInfo(IUser $user, $userInfo, bool $force = false): void {
 		if (!($this->autoUpdateEnabled() || $force)) {
 			throw new LoginException('Account auto-update is disabled.');
 		}
-		if ($force || $user->canChangeMailAddress()) {
-			$currentEmail = $this->client->getUserEmail($userInfo);
-			if ($currentEmail && $currentEmail !== $user->getEMailAddress()) {
-				$this->logger->debug('AutoProvisioningService: setting e-mail to ' . $currentEmail);
-				$user->setEMailAddress($currentEmail);
+		# email is only changed in case the mode is not `email`
+		if ($this->client->mode() !== 'email') {
+			if ($force || $user->canChangeMailAddress()) {
+				$currentEmail = $this->client->getUserEmail($userInfo);
+				if ($currentEmail && $currentEmail !== $user->getEMailAddress()) {
+					$this->logger->debug('AutoProvisioningService: setting e-mail to ' . $currentEmail);
+					$user->setEMailAddress($currentEmail);
+				}
 			}
 		}
 
@@ -153,24 +182,39 @@ class AutoProvisioningService {
 			}
 		}
 	}
-	
+
 	public function autoProvisioningEnabled(): bool {
-		return \boolval($this->client->getAutoProvisionConfig()['enabled'] ?? false);
+		return (bool)($this->client->getAutoProvisionConfig()['enabled'] ?? false);
 	}
 
 	public function autoUpdateEnabled(): bool {
-		return \boolval($this->client->getAutoUpdateConfig()['enabled'] ?? false);
+		return (bool)($this->client->getAutoUpdateConfig()['enabled'] ?? false);
 	}
 
+	/**
+	 * @throws \Exception
+	 */
 	protected function downloadPicture(string $pictureUrl): string {
 		return $this->clientService->newClient()->get($pictureUrl)->getBody();
 	}
 
 	private function generateUserId(): string {
-		return 'oidc-user-'.\bin2hex(\random_bytes(16));
+		$random = $this->secureRandom->generate(
+			16,
+			ISecureRandom::CHAR_LOWER . ISecureRandom::CHAR_UPPER . ISecureRandom::CHAR_DIGITS
+		);
+		return "oidc-user-$random";
 	}
 
 	private function generatePassword(): string {
-		return \bin2hex(\random_bytes(32));
+		$event = new GenericEvent();
+
+		$this->eventDispatcher->dispatch($event, 'OCP\User::createPassword');
+
+		if ($event->hasArgument('password')) {
+			return $event->getArgument('password');
+		}
+
+		return $this->secureRandom->generate(32);
 	}
 }

@@ -229,7 +229,8 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		$this->lookupService->expects(self::once())->method('lookupUser')->willReturn($user);
 		$request = $this->createMock(IRequest::class);
 		$request->method('getHeader')->willReturn('Bearer 1234567890');
-		$this->autoProvisioningService->expects(self::once())->method('updateAccountInfo')->with($user, $userInfo)->willReturn(null);
+		$this->autoProvisioningService->expects(self::once())->method('updateAccountInfo')->with($user, $userInfo)->willReturnCallback(function () {
+		});
 		$this->authModule->auth($request);
 	}
 }
