@@ -135,7 +135,7 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 	 * @throws LoginException
 	 */
 	public function testInvalidTokenWithIntrospection(): void {
-		$this->client->method('getOpenIdConfig')->willReturn(['use-token-introspection-endpoint' => true]);
+		$this->client->method('getOpenIdConfig')->willReturn([]);
 		$this->client->method('introspectToken')->willReturn((object)['error' => 'expired']);
 		$this->cacheFactory->method('create')->willReturn(new ArrayCache());
 		$request = $this->createMock(IRequest::class);
@@ -150,7 +150,7 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 	 * @throws LoginException
 	 */
 	public function testInvalidTokenWithIntrospectionNotActive(): void {
-		$this->client->method('getOpenIdConfig')->willReturn(['use-token-introspection-endpoint' => true]);
+		$this->client->method('getOpenIdConfig')->willReturn([]);
 		$this->client->method('introspectToken')->willReturn((object)['active' => false]);
 		$this->cacheFactory->method('create')->willReturn(new ArrayCache());
 		$request = $this->createMock(IRequest::class);
@@ -165,7 +165,7 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 	 * @throws LoginException
 	 */
 	public function testValidTokenWithIntrospection(): void {
-		$this->client->method('getOpenIdConfig')->willReturn(['use-token-introspection-endpoint' => true]);
+		$this->client->method('getOpenIdConfig')->willReturn([]);
 		$this->client->method('introspectToken')->willReturn((object)['active' => true, 'exp' => \time() + 3600]);
 		$this->client->method('getUserInfo')->willReturn((object)['email' => 'foo@example.com']);
 		$this->cacheFactory->method('create')->willReturn(new ArrayCache());
@@ -182,7 +182,7 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 	 * @throws LoginException
 	 */
 	public function testValidTokenWithJWT(): void {
-		$this->client->method('getOpenIdConfig')->willReturn(['use-token-introspection-endpoint' => false]);
+		$this->client->method('getOpenIdConfig')->willReturn([]);
 		$this->client->method('verifyJWTsignature')->willReturn(true);
 		$this->client->method('getAccessTokenPayload')->willReturn((object)['exp' => \time() + 3600]);
 		$this->client->method('getUserInfo')->willReturn((object)['email' => 'foo@example.com']);

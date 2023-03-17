@@ -148,7 +148,6 @@ $CONFIG = [
 - provider-params - additional config depending on the IdP is to be entered here - usually only necessary if the IdP does not support service discovery
 - auth-params - additional parameters which are sent to the IdP during the auth requests
 - redirect-url - the full url under which the ownCloud OpenId Connect redirect url is reachable - only needed in special setups
-- use-token-introspection-endpoint - if set to true the token introspection endpoint is used to verify a given access token - only needed if the access token is not a JWT
 - token-introspection-endpoint-client-id & token-introspection-endpoint-client-secret - client id and secret to be used with the token introspection endpoint
 - post_logout_redirect_uri - a given url where the IdP should redirect to after logout
 - mode - the mode to search for user in ownCloud - either userid or email
@@ -225,7 +224,6 @@ To set it up locally do the following:
          'loginButtonName' => 'node-oidc-provider',
          'mode' => 'userid',
          'search-attribute' => 'sub',
-         'use-token-introspection-endpoint' => true,
          // do not verify tls host or peer
          'insecure' => true
      ],
