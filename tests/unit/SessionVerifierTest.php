@@ -233,7 +233,6 @@ class SessionVerifierTest extends TestCase {
 		$cache = $this->createMock(ICache::class);
 		$this->cacheFactory->expects(self::exactly(2))->method('create')->with('oca.openid-connect')->willReturn($cache);
 		$exp = \time() + 3600;
-		$this->client->method('getOpenIdConfig')->willReturn(['use-token-introspection-endpoint' => true]);
 		$this->client->method('introspectToken')->willReturn((object)['active' => true, 'exp' => $exp]);
 
 		$cache->expects(self::once())->method('set')->with('access-123456', $exp);
