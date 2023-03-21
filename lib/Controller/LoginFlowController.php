@@ -177,7 +177,7 @@ class LoginFlowController extends Controller {
 			$openIdConfig = $openid->getOpenIdConfig();
 			$cookieName = $openIdConfig['ocis-routing-policy-cookie'] ?? 'owncloud-selector';
 			$cookieDirectives = $openIdConfig['ocis-routing-policy-cookie-directives'] ?? 'path=/;';
-			$attribute = $openIdConfig['ocis-routing-poclicy-claim'] ?? 'ocis.routing.policy';
+			$attribute = $openIdConfig['ocis-routing-policy-claim'] ?? 'ocis.routing.policy';
 			if (\property_exists($userInfo, $attribute)) {
 				$response->addHeader('Set-Cookie', "$cookieName={$userInfo->$attribute};$cookieDirectives");
 			}
