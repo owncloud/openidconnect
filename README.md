@@ -10,7 +10,7 @@
 
 A distributed memcache setup is required to properly operate this app - like Redis or memcached.
 For development purpose APCu is reasonable as well.
-Please follow the [documentation on how to set up caching](https://doc.owncloud.org/server/admin_manual/configuration/server/caching_configuration.html#supported-caching-backends).
+Please follow the [documentation on how to set up caching](https://doc.owncloud.com/server/admin_manual/configuration/server/caching_configuration.html#supported-caching-backends).
 
 ### Setup
 
