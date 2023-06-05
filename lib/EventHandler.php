@@ -30,7 +30,6 @@ use Sabre\DAV\Auth\Plugin;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 class EventHandler {
-
 	/** @var EventDispatcherInterface */
 	private $dispatcher;
 	/** @var IRequest */

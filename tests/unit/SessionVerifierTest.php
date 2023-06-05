@@ -39,7 +39,6 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Test\TestCase;
 
 class SessionVerifierTest extends TestCase {
-
 	/**
 	 * @var SessionVerifier
 	 */

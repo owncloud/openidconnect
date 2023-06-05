@@ -42,7 +42,6 @@ use PHPUnit\Framework\MockObject\MockObject;
 use Test\TestCase;
 
 class OpenIdConnectAuthModuleTest extends TestCase {
-
 	/**
 	 * @var OpenIdConnectAuthModule
 	 */

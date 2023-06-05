@@ -41,7 +41,6 @@ use PHPUnit\Framework\MockObject\MockObject;
 use Test\TestCase;
 
 class LoginFlowControllerLoginTest extends TestCase {
-
 	/**
 	 * @var LoginFlowController
 	 */

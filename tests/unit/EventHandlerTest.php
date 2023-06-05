@@ -35,7 +35,6 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Test\TestCase;
 
 class EventHandlerTest extends TestCase {
-
 	/**
 	 * @var MockObject | EventHandler
 	 */
