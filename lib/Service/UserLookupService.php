@@ -28,7 +28,6 @@ use OCP\IUser;
 use OCP\IUserManager;
 
 class UserLookupService {
-
 	/**
 	 * @var IUserManager
 	 */

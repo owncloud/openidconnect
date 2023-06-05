@@ -29,7 +29,6 @@ use PHPUnit\Framework\MockObject\MockObject;
 use Test\TestCase;
 
 class LoggerTest extends TestCase {
-
 	/**
 	 * @var MockObject | ILogger
 	 */

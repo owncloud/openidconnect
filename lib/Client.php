@@ -31,7 +31,6 @@ use OCP\IURLGenerator;
 use OCP\ILogger;
 
 class Client extends OpenIDConnectClient {
-
 	/** @var ISession */
 	private $session;
 	/** @var IConfig */

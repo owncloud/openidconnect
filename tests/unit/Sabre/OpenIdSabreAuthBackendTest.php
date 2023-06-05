@@ -35,7 +35,6 @@ use Sabre\HTTP\ResponseInterface;
 use Test\TestCase;
 
 class OpenIdSabreAuthBackendTest extends TestCase {
-
 	/**
 	 * @var OpenIdSabreAuthBackend
 	 */

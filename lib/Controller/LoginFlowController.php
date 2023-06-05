@@ -43,7 +43,6 @@ use OCP\IUserSession;
 use OCP\Util;
 
 class LoginFlowController extends Controller {
-
 	/**
 	 * @var ISession
 	 */

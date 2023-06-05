@@ -111,7 +111,6 @@ class OpenIdSabreAuthBackend implements BackendInterface {
 		if ($this->userSession->isLoggedIn() &&
 			$this->isDavAuthenticated($this->userSession->getUser()->getUID())) {
 			try {
-
 				// verify the bearer token
 				$tokenUser = $this->authModule->authToken($type, $token);
 				if ($tokenUser === null) {
@@ -172,7 +171,6 @@ class OpenIdSabreAuthBackend implements BackendInterface {
 	}
 
 	public function challenge(RequestInterface $request, ResponseInterface $response) {
-
 		// setup realm
 		$defaults = new \OC_Defaults();
 		$realm = $defaults->getName();

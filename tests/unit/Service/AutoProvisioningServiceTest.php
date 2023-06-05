@@ -43,7 +43,6 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 use Test\TestCase;
 
 class AutoProvisioningServiceTest extends TestCase {
-
 	/**
 	 * @var IUserManager|MockObject
 	 */

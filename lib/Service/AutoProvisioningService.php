@@ -38,7 +38,6 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\EventDispatcher\GenericEvent;
 
 class AutoProvisioningService {
-
 	/**
 	 * @var IUserManager
 	 */

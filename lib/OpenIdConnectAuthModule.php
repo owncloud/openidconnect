@@ -42,7 +42,6 @@ use OCP\IUserManager;
  * @package OCA\OpenIdConnect
  */
 class OpenIdConnectAuthModule implements IAuthModule {
-
 	/** @var IUserManager */
 	private $manager;
 	/** @var ILogger */
