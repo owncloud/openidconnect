@@ -3,7 +3,7 @@
     "type": "library",
     "description": "OpenId Connect app for ownCloud",
     "require": {
-        "php": ">=7.3",
+        "php": ">=7.4",
         "jumbojett/openid-connect-php": "^0.9.10"
     },
     "require-dev": {
@@ -25,7 +25,7 @@
         "optimize-autoloader": true,
         "classmap-authoritative": false,
         "platform": {
-            "php": "7.3"
+            "php": "7.4"
         },
         "allow-plugins": {
             "bamarni/composer-bin-plugin": true
