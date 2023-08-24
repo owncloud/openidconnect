@@ -8,32 +8,15 @@ repository:
   allow_squash_merge: false
   allow_merge_commit: true
   allow_rebase_merge: false
-  
-teams:
-  - name: internal-developers
-    permission: push
-  - name: security-alerts
-    permission: push
-  - name: ci
-    permission: admin
-    
+
 milestones:
   - title: backlog
     description: Development backlog containing the list of tasks that have been accepted for development.
     state: open
   - title: maybe some day
-    description: Contains tasks that have NOT been accepted for development. 
+    description: Contains tasks that have NOT been accepted for development.
     state: open
-    
-branches:
-  - name: master
-    protection:
-      required_pull_request_reviews:
-        required_approving_review_count: 1
-        dismiss_stale_reviews: true
-      required_status_checks:
-        strict: true
-        contexts: ['continuous-integration/drone/pr', 'codecov/project', 'codecov/patch']
+
 labels:
   - name: 1 - To develop
     color: ededed
