@@ -1,7 +1,7 @@
 repository:
   name: openidconnect
   description: OpenId Connect Integration for ownCloud
-  private: true
+  private: false
   has_wiki: false
   topics: openid, owncloud
   default_branch: master
