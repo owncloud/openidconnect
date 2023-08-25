@@ -30,5 +30,7 @@ return [
 		['name' => 'loginFlow#login', 'url' => '/redirect', 'verb' => 'GET'],
 		// front channel logout url
 		['name' => 'loginFlow#logout', 'url' => '/logout', 'verb' => 'GET'],
+		// webfinger endpoint
+		['name' => 'Webfinger#index', 'url' => '/webfinger', 'verb' => 'GET'],
 	]
 ];
