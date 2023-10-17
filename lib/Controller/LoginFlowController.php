@@ -41,6 +41,7 @@ use OCP\IRequest;
 use OCP\ISession;
 use OCP\IUserSession;
 use OCP\Util;
+use OCP\Security\ICrypto;
 
 class LoginFlowController extends Controller {
 	/**
@@ -71,6 +72,12 @@ class LoginFlowController extends Controller {
 	 * @var AutoProvisioningService
 	 */
 	private $autoProvisioningService;
+	/**
+	 *  @var ICrypto
+	 */
+	private $crypto;
+
+	const COOKIE_DIRECTIVES = 'Path=/; Secure; HttpOnly';
 
 	public function __construct(
 		string $appName,
@@ -81,7 +88,8 @@ class LoginFlowController extends Controller {
 		ILogger $logger,
 		Client $client,
 		ICacheFactory $memCacheFactory,
-		AutoProvisioningService $autoProvisioningService
+		AutoProvisioningService $autoProvisioningService,
+		ICrypto $crypto
 	) {
 		parent::__construct($appName, $request);
 		if (!$userSession instanceof Session) {
@@ -95,6 +103,7 @@ class LoginFlowController extends Controller {
 		$this->logger = new Logger($logger);
 		$this->memCacheFactory = $memCacheFactory;
 		$this->autoProvisioningService = $autoProvisioningService;
+		$this->crypto = $crypto;
 	}
 
 	/**
@@ -130,6 +139,11 @@ class LoginFlowController extends Controller {
 		try {
 			$this->logger->debug('Before openid->authenticate');
 			$openid->storeRedirectUrl($this->request->getParam('redirect_url'));
+			try {
+				$openid->addAuthParam(['login_hint' => $this->crypto->decrypt($this->request->getCookie('oc_loginHint'))]);
+			} catch (\Exception $ex) {
+				// Invalid cookie will be replaced later
+			}
 			$openid->authenticate();
 		} catch (OpenIDConnectClientException $ex) {
 			$this->logger->logException($ex);
@@ -175,11 +189,14 @@ class LoginFlowController extends Controller {
 			$response = new RedirectResponse($this->getDefaultUrl());
 			$openIdConfig = $openid->getOpenIdConfig();
 			$cookieName = $openIdConfig['ocis-routing-policy-cookie'] ?? 'owncloud-selector';
-			$cookieDirectives = $openIdConfig['ocis-routing-policy-cookie-directives'] ?? 'path=/;';
+			$cookieDirectives = $openIdConfig['ocis-routing-policy-cookie-directives'] ?? self::COOKIE_DIRECTIVES;
 			$attribute = $openIdConfig['ocis-routing-policy-claim'] ?? 'ocis.routing.policy';
 			if (\property_exists($userInfo, $attribute)) {
 				$response->addHeader('Set-Cookie', "$cookieName={$userInfo->$attribute};$cookieDirectives");
 			}
+			$loginHint = $openIdConfig['mode'] === 'email' ? $user->getEMailAddress() : $user->getUID();
+			$loginHint = $this->crypto->encrypt($loginHint);
+			$response->addHeader('Set-Cookie', "oc_loginHint=$loginHint;" . self::COOKIE_DIRECTIVES);
 			return $response;
 		}
 		$this->logger->error("Unable to login {$user->getUID()}");

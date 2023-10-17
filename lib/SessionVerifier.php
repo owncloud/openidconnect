@@ -122,6 +122,7 @@ class SessionVerifier {
 			$this->logger->logException($ex);
 		}
 		try {
+			setcookie('oc_loginHint', '');
 			$this->session->remove('oca.openid-connect.access-token');
 			$this->session->remove('oca.openid-connect.refresh-token');
 			$this->session->remove('oca.openid-connect.id-token');
