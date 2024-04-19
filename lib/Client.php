@@ -25,6 +25,7 @@ namespace OCA\OpenIdConnect;
 
 use Jumbojett\OpenIDConnectClient;
 use Jumbojett\OpenIDConnectClientException;
+use OCP\Http\Client\IClientService;
 use OCP\IConfig;
 use OCP\ISession;
 use OCP\IURLGenerator;
@@ -44,6 +45,7 @@ class Client extends OpenIDConnectClient {
 	 * @var IURLGenerator
 	 */
 	private $generator;
+	private IClientService $clientService;
 
 	/**
 	 * Client constructor.
@@ -59,12 +61,14 @@ class Client extends OpenIDConnectClient {
 		IConfig $config,
 		IURLGenerator $generator,
 		ISession $session,
-		ILogger $logger
+		ILogger $logger,
+		IClientService $clientService
 	) {
 		$this->session = $session;
 		$this->config = $config;
 		$this->generator = $generator;
 		$this->logger = $logger;
+		$this->clientService = $clientService;
 
 		$openIdConfig = $this->getOpenIdConfig();
 		if ($openIdConfig === null) {
@@ -91,31 +95,6 @@ class Client extends OpenIDConnectClient {
 		if (isset($openIdConfig['auth-params'])) {
 			$this->addAuthParam($openIdConfig['auth-params']);
 		}
-		// set http proxy if defined in config
-		$proxy = $this->getProxyUri();
-		if ($proxy) {
-			$this->setHttpProxy($proxy);
-		}
-	}
-
-	/**
-	 * Get the proxy URI
-	 *
-	 * @return string
-	 */
-	private function getProxyUri() {
-		$proxyHost = $this->config->getSystemValue('proxy', null);
-		$proxyUserPwd = $this->config->getSystemValue('proxyuserpwd', null);
-		$proxyUri = '';
-
-		if ($proxyUserPwd !== null) {
-			$proxyUri .= $proxyUserPwd . '@';
-		}
-		if ($proxyHost !== null) {
-			$proxyUri .= $proxyHost;
-		}
-
-		return $proxyUri;
 	}
 
 	/**
@@ -353,9 +332,29 @@ class Client extends OpenIDConnectClient {
 	 * @throws OpenIDConnectClientException
 	 */
 	protected function fetchURL($url, $post_body = null, $headers = []) {
-		// TODO: see how to use ownCloud HttpClient ....
+		$this->logger->debug("Fetching URL: $url");
 		try {
-			return parent::fetchURL($url, $post_body, $headers);
+			$client = $this->clientService->newClient();
+			if ($post_body === null) {
+				return $client->get($url, [
+					'headers' => $headers,
+				])->getBody();
+			}
+			// Default content type is form encoded
+			$content_type = 'application/x-www-form-urlencoded';
+
+			// Determine if this is a JSON payload and add the appropriate content type
+			if (\is_object(json_decode($post_body))) {
+				$content_type = 'application/json';
+			}
+
+			// Add POST-specific headers
+			$headers[] = "Content-Type: {$content_type}";
+
+			return $client->post($url, [
+				'headers' => $headers,
+				'body' => $post_body,
+			]);
 		} catch (\Exception $ex) {
 			$exception = \get_class($ex);
 			$msg = $ex->getMessage();
