@@ -25,6 +25,7 @@ namespace OCA\OpenIdConnect\Tests\Unit;
 use JsonException;
 use Jumbojett\OpenIDConnectClientException;
 use OCA\OpenIdConnect\Client;
+use OCP\Http\Client\IClientService;
 use OCP\IConfig;
 use OCP\ISession;
 use OCP\IURLGenerator;
@@ -53,6 +54,10 @@ class ClientTest extends TestCase {
 	 * @var MockObject | IConfig
 	 */
 	private $config;
+	/**
+	 * @var MockObject | IClientService
+	 */
+	private $clientService;
 
 	public function providesGetUserInfoData(): array {
 		return [
@@ -74,9 +79,10 @@ class ClientTest extends TestCase {
 		$this->urlGenerator = $this->createMock(IURLGenerator::class);
 		$this->session = $this->createMock(ISession::class);
 		$this->logger = $this->createMock(ILogger::class);
+		$this->clientService = $this->createMock(IClientService::class);
 
 		$this->client = $this->getMockBuilder(Client::class)
-			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger])
+			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger, $this->clientService])
 			->onlyMethods(['fetchURL'])
 			->getMock();
 	}
@@ -139,7 +145,7 @@ class ClientTest extends TestCase {
 			throw new \InvalidArgumentException("Unexpected key: $key");
 		});
 		$this->client = $this->getMockBuilder(Client::class)
-			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger])
+			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger, $this->clientService])
 			->onlyMethods(['fetchURL'])
 			->getMock();
 
@@ -175,7 +181,7 @@ class ClientTest extends TestCase {
 			throw new \InvalidArgumentException("Unexpected key: $key");
 		});
 		$this->client = $this->getMockBuilder(Client::class)
-			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger])
+			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger, $this->clientService])
 			->onlyMethods(['fetchURL'])
 			->getMock();
 
@@ -210,7 +216,7 @@ class ClientTest extends TestCase {
 		});
 
 		$this->client = $this->getMockBuilder(Client::class)
-			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger])
+			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger, $this->clientService])
 			->onlyMethods(['requestUserInfo', 'getAccessTokenPayload'])
 			->getMock();
 		if ($useAccessTokenPayloadForUserInfo) {
