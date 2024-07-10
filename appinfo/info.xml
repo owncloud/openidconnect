@@ -19,7 +19,7 @@ The integration requires an Identity Provider that supports OpenID Connect (e.g.
 More information on setup, configuration and migration can be found in the ownCloud Documentation.</description>
     <licence>GPLv2</licence>
     <author>Thomas Müller</author>
-    <version>2.2.0</version>
+    <version>2.3.0</version>
     <namespace>OpenIdConnect</namespace>
     <category>integration</category>
     <documentation>

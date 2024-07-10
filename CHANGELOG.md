@@ -4,7 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased] - xxxx-xx-xx
+## [2.3.0] - 2024-07-10
+
+### Added 
+
+- [#255](https://github.com/owncloud/openidconnect/pull/255) - feat: use password policy app to generate password for provisioned users (#282)
+
+### Changed
+
+- [#286](https://github.com/owncloud/openidconnect/pull/286) - chore: remove unused config option `use-token-introspection-endpoint`
+- [#298](https://github.com/owncloud/openidconnect/pull/298) - chore: drop php 7.3 - ownCloud server 10.12 is minimum criteria
+- [#314](https://github.com/owncloud/openidconnect/pull/314) - sec: bump phpseclib to 3.0.39
+- dependency updates; github/settings updates; README.md updates.
 
 
 ## [2.2.0] - 2022-12-21
@@ -92,7 +103,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 - Initial Release
 
-[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.2.0...master
+[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.3.0...master
+[2.3.0]: https://github.com/owncloud/openidconnect/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/owncloud/openidconnect/compare/v2.1.1...v2.2.0
 [2.1.1]: https://github.com/owncloud/openidconnect/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/owncloud/openidconnect/compare/v2.0.0...v2.1.0
