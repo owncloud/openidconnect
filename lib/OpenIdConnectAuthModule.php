@@ -148,6 +148,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 
 	/**
 	 * @throws OpenIDConnectClientException
+	 * @throws \JsonException
 	 */
 	private function verifyToken(string $token) {
 		$cache = $this->getCache();

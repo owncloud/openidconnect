@@ -166,6 +166,14 @@ class Client extends OpenIDConnectClient {
 	 * @return object|null
 	 */
 	public function getAccessTokenPayload(): ?object {
+		if ($this->accessToken === '') {
+			return null;
+		}
+		$parts = explode('.', $this->accessToken);
+		if (!isset($parts[1])) {
+			return null;
+		}
+
 		return parent::getAccessTokenPayload();
 	}
 
@@ -200,6 +208,9 @@ class Client extends OpenIDConnectClient {
 		}
 
 		$introData = $this->introspectToken($token, '', $introspectionClientId, $introspectionClientSecret);
+		if ($introData === null) {
+			return null;
+		}
 		$this->logger->debug('Introspection info: ' . \json_encode($introData, JSON_THROW_ON_ERROR));
 		if (\property_exists($introData, 'error')) {
 			$this->logger->error('Token introspection failed: ' . \json_encode($introData, JSON_THROW_ON_ERROR));
@@ -210,6 +221,17 @@ class Client extends OpenIDConnectClient {
 			throw new OpenIDConnectClientException('Token (as per introspection) is inactive');
 		}
 		return $introData->exp;
+	}
+
+	public function introspectToken($token, $token_type_hint = '', $clientId = null, $clientSecret = null) {
+		try {
+			# test if introspection is possible ...
+			$this->getProviderConfigValue('introspection_endpoint');
+		} catch (OpenIDConnectClientException $e) {
+			return null;
+		}
+
+		return parent::introspectToken($token, $token_type_hint, $clientId, $clientSecret);
 	}
 
 	/**
