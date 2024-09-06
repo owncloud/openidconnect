@@ -30,7 +30,6 @@ use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\OpenIdConnectAuthModule;
 use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
-use OCP\Http\Client\IClientService;
 use OCP\ICacheFactory;
 use OCP\IConfig;
 use OCP\ILogger;
@@ -78,10 +77,9 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		$config = $this->createMock(IConfig::class);
 		$generator = $this->createMock(IURLGenerator::class);
 		$session = $this->createMock(ISession::class);
-		$clientService = $this->createMock(IClientService::class);
 		$this->client = $this->getMockBuilder(Client::class)
 			->onlyMethods(['getUserInfo', 'refreshToken', 'signOut', 'getOpenIdConfig', 'verifyJWTsignature', 'getAccessTokenPayload', 'setAccessToken', 'introspectToken', 'getAutoProvisionConfig'])
-			->setConstructorArgs([$config, $generator, $session, $this->logger, $clientService])
+			->setConstructorArgs([$config, $generator, $session, $this->logger])
 			->getMock();
 
 		$this->autoProvisioningService = $this->createMock(AutoProvisioningService::class);
