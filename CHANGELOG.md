@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] - XXXX-xx-xx
 
+### Added
+
+- []() - feat: provision group membership based on userinfo
 
 ## [2.3.0] - 2024-07-10
 
