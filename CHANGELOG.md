@@ -4,8 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased] - XXXX-xx-xx
+## [2.3.1] - 2024-10-17
 
+### Fixed
+
+- [#319](https://github.com/owncloud/openidconnect/pull/319) - fix: do not spam log file when running in parallel with oauth app
 
 ## [2.3.0] - 2024-07-10
 
@@ -106,7 +109,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 - Initial Release
 
-[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.3.0...master
+[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.3.1...master
+[2.3.1]: https://github.com/owncloud/openidconnect/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/owncloud/openidconnect/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/owncloud/openidconnect/compare/v2.1.1...v2.2.0
 [2.1.1]: https://github.com/owncloud/openidconnect/compare/v2.1.0...v2.1.1
