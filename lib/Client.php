@@ -279,6 +279,11 @@ class Client extends OpenIDConnectClient {
 		return $this->getAutoProvisionConfig()['picture-claim'] ?? null;
 	}
 
+	public function getGroupsClaim(): ?string
+	{
+		return $this->getAutoProvisionConfig()['groups-claim'] ?? null;
+	}
+
 	public function getUserEmail($userInfo): ?string {
 		$email = $this->mode() === 'email' ? $userInfo->{$this->getIdentityClaim()} : null;
 		$emailClaim = $this->getEmailClaim();
@@ -300,6 +305,14 @@ class Client extends OpenIDConnectClient {
 		$pictureClaim = $this->getPictureClaim();
 		if ($pictureClaim) {
 			return $userInfo->$pictureClaim;
+		}
+		return null;
+	}
+
+	public function getUserGroupIds($userInfo): ?string {
+		$groupsClaim = $this->getGroupsClaim();
+		if ($groupsClaim) {
+			return $userInfo->$groupsClaim;
 		}
 		return null;
 	}
