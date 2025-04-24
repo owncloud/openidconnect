@@ -169,7 +169,7 @@ class SessionVerifierTest extends TestCase {
 
 		$this->userSession->expects(self::never())->method('logout');
 		$this->client->expects(self::once())->method('refreshToken')->with('refresh-123456')->willReturn((object)[]);
-		$this->session->expects(self::exactly(3))->method('set');
+		$this->session->expects(self::exactly(2))->method('set');
 
 		$this->sessionVerifier->verifySession();
 	}
