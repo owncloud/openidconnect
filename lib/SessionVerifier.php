@@ -157,7 +157,8 @@ class SessionVerifier {
 					throw new HintException("Verifying token failed: $response->error");
 				}
 
-				$this->session->set('oca.openid-connect.id-token', $this->client->getIdToken());
+				// idToken is not available in the response for the refresh token
+				//$this->session->set('oca.openid-connect.id-token', $this->client->getIdToken());
 				$this->session->set('oca.openid-connect.access-token', $this->client->getAccessToken());
 				$this->session->set('oca.openid-connect.refresh-token', $this->client->getRefreshToken());
 			} else {

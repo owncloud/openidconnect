@@ -355,34 +355,50 @@ class Client extends OpenIDConnectClient {
 	 */
 	protected function fetchURL($url, $post_body = null, $headers = []) {
 		$this->logger->debug("Fetching URL: $url");
+
+		$parsedHeaders = [];
+		foreach ($headers as $header) {
+			$sHeader = explode(':', $header, 2);
+			if (\count($sHeader) === 2) {
+				$parsedHeaders[trim($sHeader[0])] = trim($sHeader[1]);
+			}
+		}
+
+		$params = [
+			'headers' => $parsedHeaders,
+		];
+
 		try {
 			$client = $this->clientService->newClient();
 			if ($post_body === null) {
-				return $client->get($url, [
-					'headers' => $headers,
-				])->getBody();
+				$response = $client->get($url, $params);
+				return $this->processResponseAndGetBody($response);
 			}
-			// Default content type is form encoded
-			$content_type = 'application/x-www-form-urlencoded';
 
 			// Determine if this is a JSON payload and add the appropriate content type
-			if (\is_object(json_decode($post_body))) {
-				$content_type = 'application/json';
+			$json_post_body = \json_decode($post_body);
+			if (\is_object($json_post_body)) {
+				$params['headers']['Content-Type'] = 'application/json';
+				$params['json'] = $json_post_body;
+			} else {
+				$params['form_params'] = [];
+				\parse_str($post_body, $params['form_params']);
 			}
 
-			// Add POST-specific headers
-			$headers[] = "Content-Type: {$content_type}";
-
-			return $client->post($url, [
-				'headers' => $headers,
-				'body' => $post_body,
-			]);
+			return $this->processResponseAndGetBody($client->post($url, $params));
 		} catch (\Exception $ex) {
 			$exception = \get_class($ex);
 			$msg = $ex->getMessage();
 			$this->logger->error("$exception accessing $url: $msg");
 			throw $ex;
 		}
+	}
+
+	private function processResponseAndGetBody($response) {
+		$this->responseCode = $response->getStatusCode();
+		// we can't set the content type for now: the attribute is private
+		//$this->responseContentType = $response->getHeader('Content-Type');
+		return $response->getBody();
 	}
 
 	/**
