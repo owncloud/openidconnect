@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 ## [Unreleased] - XXXX-XX-XX
 
 
+## [2.3.2] - 2025-04-29
+
+### Fixed
+
+- [#330](https://github.com/owncloud/openidconnect/pull/330) - feat: use OCP\Http\Client\IClientService
+
+
 ## [2.3.1] - 2024-10-17
 
 ### Fixed
