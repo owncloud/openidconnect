@@ -25,6 +25,7 @@ namespace OCA\OpenIdConnect\Tests\Unit;
 use JsonException;
 use Jumbojett\OpenIDConnectClientException;
 use OC\HintException;
+use OC\Http\Client\ClientService;
 use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\Logger;
 use OCA\OpenIdConnect\SessionVerifier;
@@ -70,9 +71,10 @@ class SessionVerifierTest extends TestCase {
 
 		$config = $this->createMock(IConfig::class);
 		$generator = $this->createMock(IURLGenerator::class);
+		$clientService = $this->createMock(ClientService::class);
 		$this->client = $this->getMockBuilder(Client::class)
 			->onlyMethods(['refreshToken', 'signOut', 'getOpenIdConfig', 'verifyJWTsignature', 'getAccessTokenPayload', 'setAccessToken', 'introspectToken'])
-			->setConstructorArgs([$config, $generator, $this->session, $logger])
+			->setConstructorArgs([$config, $generator, $this->session, $logger, $clientService])
 			->getMock();
 
 		$this->sessionVerifier = new SessionVerifier($logger, $this->session, $this->userSession, $this->cacheFactory, $dispatcher, $this->client);
@@ -167,7 +169,7 @@ class SessionVerifierTest extends TestCase {
 
 		$this->userSession->expects(self::never())->method('logout');
 		$this->client->expects(self::once())->method('refreshToken')->with('refresh-123456')->willReturn((object)[]);
-		$this->session->expects(self::exactly(3))->method('set');
+		$this->session->expects(self::exactly(2))->method('set');
 
 		$this->sessionVerifier->verifySession();
 	}

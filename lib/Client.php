@@ -25,6 +25,7 @@ namespace OCA\OpenIdConnect;
 
 use Jumbojett\OpenIDConnectClient;
 use Jumbojett\OpenIDConnectClientException;
+use OCP\Http\Client\IClientService;
 use OCP\IConfig;
 use OCP\ISession;
 use OCP\IURLGenerator;
@@ -44,6 +45,7 @@ class Client extends OpenIDConnectClient {
 	 * @var IURLGenerator
 	 */
 	private $generator;
+	private IClientService $clientService;
 
 	/**
 	 * Client constructor.
@@ -59,12 +61,14 @@ class Client extends OpenIDConnectClient {
 		IConfig $config,
 		IURLGenerator $generator,
 		ISession $session,
-		ILogger $logger
+		ILogger $logger,
+		IClientService $clientService
 	) {
 		$this->session = $session;
 		$this->config = $config;
 		$this->generator = $generator;
 		$this->logger = $logger;
+		$this->clientService = $clientService;
 
 		$openIdConfig = $this->getOpenIdConfig();
 		if ($openIdConfig === null) {
@@ -91,31 +95,6 @@ class Client extends OpenIDConnectClient {
 		if (isset($openIdConfig['auth-params'])) {
 			$this->addAuthParam($openIdConfig['auth-params']);
 		}
-		// set http proxy if defined in config
-		$proxy = $this->getProxyUri();
-		if ($proxy) {
-			$this->setHttpProxy($proxy);
-		}
-	}
-
-	/**
-	 * Get the proxy URI
-	 *
-	 * @return string
-	 */
-	private function getProxyUri() {
-		$proxyHost = $this->config->getSystemValue('proxy', null);
-		$proxyUserPwd = $this->config->getSystemValue('proxyuserpwd', null);
-		$proxyUri = '';
-
-		if ($proxyUserPwd !== null) {
-			$proxyUri .= $proxyUserPwd . '@';
-		}
-		if ($proxyHost !== null) {
-			$proxyUri .= $proxyHost;
-		}
-
-		return $proxyUri;
 	}
 
 	/**
@@ -375,15 +354,51 @@ class Client extends OpenIDConnectClient {
 	 * @throws OpenIDConnectClientException
 	 */
 	protected function fetchURL($url, $post_body = null, $headers = []) {
-		// TODO: see how to use ownCloud HttpClient ....
+		$this->logger->debug("Fetching URL: $url");
+
+		$parsedHeaders = [];
+		foreach ($headers as $header) {
+			$sHeader = explode(':', $header, 2);
+			if (\count($sHeader) === 2) {
+				$parsedHeaders[trim($sHeader[0])] = trim($sHeader[1]);
+			}
+		}
+
+		$params = [
+			'headers' => $parsedHeaders,
+		];
+
 		try {
-			return parent::fetchURL($url, $post_body, $headers);
+			$client = $this->clientService->newClient();
+			if ($post_body === null) {
+				$response = $client->get($url, $params);
+				return $this->processResponseAndGetBody($response);
+			}
+
+			// Determine if this is a JSON payload and add the appropriate content type
+			$json_post_body = \json_decode($post_body);
+			if (\is_object($json_post_body)) {
+				$params['headers']['Content-Type'] = 'application/json';
+				$params['json'] = $json_post_body;
+			} else {
+				$params['form_params'] = [];
+				\parse_str($post_body, $params['form_params']);
+			}
+
+			return $this->processResponseAndGetBody($client->post($url, $params));
 		} catch (\Exception $ex) {
 			$exception = \get_class($ex);
 			$msg = $ex->getMessage();
 			$this->logger->error("$exception accessing $url: $msg");
 			throw $ex;
 		}
+	}
+
+	private function processResponseAndGetBody($response) {
+		$this->responseCode = $response->getStatusCode();
+		// we can't set the content type for now: the attribute is private
+		//$this->responseContentType = $response->getHeader('Content-Type');
+		return $response->getBody();
 	}
 
 	/**
