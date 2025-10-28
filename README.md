@@ -112,6 +112,10 @@ $CONFIG = [
       'display-name-claim' => 'given_name',
       // defines the claim which holds the picture of the user - must be a URL
       'picture-claim' => 'picture',
+      // defines the claim which holds the list of user's group IDs - must be a list of strings
+      // unknown groups are ignored
+      // if not set, group membership is not changed
+      'groups-claim' => 'groups',
       // defines a list of groups to which the newly created user will be added automatically
       'groups' => ['admin', 'guests', 'employees'],
     ],
