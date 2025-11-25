@@ -28,6 +28,7 @@ use OCA\OpenIdConnect\Client;
 use OC\User\LoginException;
 use OCP\Http\Client\IClientService;
 use OCP\IAvatarManager;
+use OCP\IGroup;
 use OCP\IGroupManager;
 use OCP\ILogger;
 use OCP\IUser;
@@ -178,6 +179,35 @@ class AutoProvisioningService {
 			if ($currentDN && $currentDN !== $user->getDisplayName()) {
 				$this->logger->debug('AutoProvisioningService: setting display name to ' . $currentDN);
 				$user->setDisplayName($currentDN);
+			}
+		}
+
+		$currentGroupIds = $this->client->getUserGroupIds($userInfo);
+		if ($currentGroupIds) {
+			$memberOfGroups = $this->groupManager->getUserGroups($user);
+			$memberOfGroupIds = array_map(
+				function (IGroup $group) {
+					return $group->getGID();
+				},
+				$memberOfGroups,
+			);
+
+			foreach ($memberOfGroups as $group) {
+				if (array_search($group->getGID(), $currentGroupIds) === false) {
+					$this->logger->debug('AutoProvisioningService: removing from group ' . $group->getGID());
+					$group->removeUser($user);
+				}
+			}
+
+			$addToGroupIds = array_diff($currentGroupIds, $memberOfGroupIds);
+			foreach ($addToGroupIds as $groupId) {
+				$group = $this->groupManager->get($groupId);
+				if ($group) {
+					$group->addUser($user);
+					$this->logger->debug('AutoProvisioningService: adding to group ' . $group->getGID());
+				} else {
+					$this->logger->debug('AutoProvisioningService: not adding to unknown group ' . $group->getGID());
+				}
 			}
 		}
 	}
