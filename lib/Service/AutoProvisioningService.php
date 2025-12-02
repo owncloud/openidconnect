@@ -163,7 +163,7 @@ class AutoProvisioningService {
 			throw new LoginException('Account auto-update is disabled.');
 		}
 		# email is only changed in case the mode is not `email`
-		if ($this->client->mode() !== 'email') {
+		if ($force || $this->client->mode() !== 'email') {
 			if ($force || $user->canChangeMailAddress()) {
 				$currentEmail = $this->client->getUserEmail($userInfo);
 				if ($currentEmail && $currentEmail !== $user->getEMailAddress()) {
