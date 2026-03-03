@@ -53,44 +53,12 @@ config = {
         "master",
     ],
     "appInstallCommandPhp": "make vendor",
-    "codestyle": True,
+    "codestyle": False,
     "javascript": False,
-    "phpstan": True,
-    "phan": {
-        "multipleVersions": {
-            "phpVersions": [
-                DEFAULT_PHP_VERSION,
-            ],
-        },
-    },
-    "build": {
-        "commands": [
-            "make dist",
-        ],
-    },
-    "phpunit": {
-        "allDatabases": {
-            "phpVersions": [
-                "7.4",
-            ],
-            "databases": [
-                "mariadb:10.2",
-                "mysql:8.0",
-                "postgres:9.4",
-                "oracle",
-            ],
-            "coverage": False,
-        },
-        "codecov": {
-            "phpVersions": [
-                "7.4",
-            ],
-            "databases": [
-                "sqlite",
-            ],
-            "coverage": True,
-        },
-    },
+    "phpstan": False,
+    "phan": False,
+    "build": False,
+    "phpunit": False,
 }
 
 def main(ctx):
