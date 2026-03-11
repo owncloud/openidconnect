@@ -2,12 +2,16 @@
     "name": "owncloud/openidconnect",
     "type": "library",
     "description": "OpenId Connect app for ownCloud",
+    "provide": {
+        "phpseclib/phpseclib": "^3.0.36"
+    },
     "require": {
-        "php": ">=7.4",
+        "php": ">=8.3",
         "jumbojett/openid-connect-php": "^1.0.2"
     },
     "require-dev": {
-        "bamarni/composer-bin-plugin": "^1.8"
+        "bamarni/composer-bin-plugin": "^1.8",
+        "roave/security-advisories": "dev-latest"
     },
     "extra": {
         "bamarni-bin": {
@@ -25,7 +29,7 @@
         "optimize-autoloader": true,
         "classmap-authoritative": false,
         "platform": {
-            "php": "7.4"
+            "php": "8.3"
         },
         "allow-plugins": {
             "bamarni/composer-bin-plugin": true
