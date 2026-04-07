@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] - XXXX-XX-XX
 
+### Changed
+
+- [#345](https://github.com/owncloud/openidconnect/pull/345) - bump phpseclib to 3.0.50
+
 
 ## [2.3.2] - 2025-04-29
 
