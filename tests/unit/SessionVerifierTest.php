@@ -211,8 +211,9 @@ class SessionVerifierTest extends TestCase {
 		$cache = $this->createMock(ICache::class);
 		$this->cacheFactory->expects(self::exactly(2))->method('create')->with('oca.openid-connect')->willReturn($cache);
 		$exp = \time() + 3600;
+		$this->client->method('getOpenIdConfig')->willReturn(['client-id' => 'client-id']);
 		$this->client->method('verifyJWTsignature')->willReturn(true);
-		$this->client->method('getAccessTokenPayload')->willReturn((object)['exp' => $exp]);
+		$this->client->method('getAccessTokenPayload')->willReturn((object)['exp' => $exp, 'aud' => 'client-id']);
 
 		$cache->expects(self::once())->method('set')->with('access-123456', $exp);
 		$this->userSession->expects(self::never())->method('logout');
