@@ -169,6 +169,7 @@ class Client extends OpenIDConnectClient {
 				$this->logger->error('Token cannot be verified: ' . $token);
 				throw new OpenIDConnectClientException('Token cannot be verified.');
 			}
+			$this->verifyAudience($payload, $config['client-id'] ?? $this->getClientID());
 			$this->logger->debug('Access token payload: ' . \json_encode($payload, JSON_THROW_ON_ERROR));
 			/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
 			return $payload->exp;
@@ -200,6 +201,26 @@ class Client extends OpenIDConnectClient {
 			throw new OpenIDConnectClientException('Token (as per introspection) is inactive');
 		}
 		return $introData->exp;
+	}
+
+	/**
+	 * Ensures the token was issued for this relying party by asserting that the
+	 * configured client-id is present in the token's "aud" (audience) claim.
+	 * Without this check a correctly signed token minted by the same issuer for
+	 * a different client would be accepted (see OC10-115). The "aud" claim may
+	 * be a single string or an array of strings per RFC 7519.
+	 *
+	 * @param object $payload the decoded access token payload
+	 * @param string|null $clientId the configured relying party client-id
+	 * @throws OpenIDConnectClientException if the audience does not match
+	 */
+	private function verifyAudience(object $payload, ?string $clientId): void {
+		$audience = $payload->aud ?? null;
+		$audiences = \is_array($audience) ? $audience : [$audience];
+		if ($clientId === null || !\in_array($clientId, $audiences, true)) {
+			$this->logger->error('Token audience does not match the configured client-id: ' . \json_encode($audience));
+			throw new OpenIDConnectClientException('Token audience does not match the configured client-id');
+		}
 	}
 
 	public function introspectToken($token, $token_type_hint = '', $clientId = null, $clientSecret = null) {

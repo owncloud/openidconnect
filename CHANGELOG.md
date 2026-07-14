@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] - XXXX-XX-XX
 
+### Fixed
+
+- [#356](https://github.com/owncloud/openidconnect/pull/356) - fix: verify token audience to prevent cross-client account takeover
+
 ## [2.3.3] - 2026-04-07
 
 ### Changed
