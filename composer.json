@@ -3,7 +3,7 @@
     "type": "library",
     "description": "OpenId Connect app for ownCloud",
     "provide": {
-        "phpseclib/phpseclib": "^3.0.36"
+        "phpseclib/phpseclib": "^3.0.55"
     },
     "require": {
         "php": ">=8.3",
