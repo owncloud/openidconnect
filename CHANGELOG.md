@@ -6,9 +6,16 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] - XXXX-XX-XX
 
-### Fixed
 
+## [2.4.1] - 2026-07-22
+
+### Fixed
 - [#356](https://github.com/owncloud/openidconnect/pull/356) - fix: verify token audience to prevent cross-client account takeover
+
+## [2.4.0] - 2026-06-29
+
+### Changed
+- ownCloud 11 compatible release (oc 11.0.0-rc1).
 
 ## [2.3.3] - 2026-04-07
 
@@ -131,7 +138,11 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 - Initial Release
 
-[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.3.1...master
+[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.4.1..master
+[2.4.1]: https://github.com/owncloud/openidconnect/compare/v2.4.0..v2.4.1
+[2.4.0]: https://github.com/owncloud/openidconnect/compare/v2.3.3..v2.4.0
+[2.3.3]: https://github.com/owncloud/openidconnect/compare/v2.3.2..v2.3.3
+[2.3.2]: https://github.com/owncloud/openidconnect/compare/v2.3.1..v2.3.2
 [2.3.1]: https://github.com/owncloud/openidconnect/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/owncloud/openidconnect/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/owncloud/openidconnect/compare/v2.1.1...v2.2.0
