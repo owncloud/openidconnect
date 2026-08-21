@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [2.3.4] - 2026-08-21
+
+### Security
+
+- Update phpseclib/phpseclib to 3.0.56, fixing three advisories that affect the
+  3.0.50 this app vendored:
+  - CVE-2026-44167 (high, fixed in 3.0.52) - DoS via ASN.1 OID amplification,
+    reachable through IdP-supplied X.509/JWKS material
+  - CVE-2026-55599 (medium, fixed in 3.0.54)
+  - CVE-2026-40194 (low, fixed in 3.0.51)
+
+
 ## [2.3.3] - 2026-04-07
 
 ### Changed
@@ -124,7 +136,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 - Initial Release
 
-[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.3.1...master
+[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.3.4...master
+[2.3.4]: https://github.com/owncloud/openidconnect/compare/v2.3.3...v2.3.4
+[2.3.3]: https://github.com/owncloud/openidconnect/compare/v2.3.2...v2.3.3
+[2.3.2]: https://github.com/owncloud/openidconnect/compare/v2.3.1...v2.3.2
 [2.3.1]: https://github.com/owncloud/openidconnect/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/owncloud/openidconnect/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/owncloud/openidconnect/compare/v2.1.1...v2.2.0
