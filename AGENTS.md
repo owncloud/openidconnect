@@ -1,4 +1,4 @@
-# agents.md -- OpenID Connect
+# AGENTS.md -- OpenID Connect
 
 ## Repository Overview
 
