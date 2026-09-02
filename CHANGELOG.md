@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] - XXXX-XX-XX
 
+### Fixed
+- [#365](https://github.com/owncloud/openidconnect/pull/365) - fix: verify token audience for introspected opaque tokens
 
 ## [2.4.1] - 2026-07-22
 

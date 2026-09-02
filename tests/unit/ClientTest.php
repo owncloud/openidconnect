@@ -290,4 +290,50 @@ class ClientTest extends TestCase {
 			self::assertEquals($payload['exp'], $exp);
 		}
 	}
+
+	/**
+	 * @dataProvider providesAudienceData
+	 * @param string|array|null $aud
+	 * @param bool $expectValid
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenIntrospectionAudience($aud, bool $expectValid): void {
+		$this->config->method('getSystemValue')->willReturnCallback(static function ($key) {
+			if ($key === 'openid-connect') {
+				return [
+					'provider-url' => 'https://example.net',
+					'client-id' => 'owncloud-client',
+					'client-secret' => 'secret',
+				];
+			}
+			return null;
+		});
+
+		$introspectionData = ['active' => true, 'exp' => \time() + 3600];
+		if ($aud !== null) {
+			$introspectionData['aud'] = $aud;
+		}
+
+		$this->client = $this->getMockBuilder(Client::class)
+			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger, $this->clientService])
+			->onlyMethods(['getAccessTokenPayload', 'setAccessToken', 'introspectToken'])
+			->getMock();
+		$this->client->method('setAccessToken');
+		// an opaque token has no JWT payload - this is what forces the
+		// introspection branch of verifyToken
+		$this->client->method('getAccessTokenPayload')->willReturn(null);
+		$this->client->method('introspectToken')->willReturn((object)$introspectionData);
+
+		if (!$expectValid) {
+			$this->expectException(OpenIDConnectClientException::class);
+			$this->expectExceptionMessage('Token audience does not match the configured client-id');
+		}
+
+		$exp = $this->client->verifyToken('opaque-token');
+
+		if ($expectValid) {
+			self::assertEquals($introspectionData['exp'], $exp);
+		}
+	}
 }

@@ -166,8 +166,8 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 	 * @throws LoginException
 	 */
 	public function testValidTokenWithIntrospection(): void {
-		$this->client->method('getOpenIdConfig')->willReturn([]);
-		$this->client->method('introspectToken')->willReturn((object)['active' => true, 'exp' => \time() + 3600]);
+		$this->client->method('getOpenIdConfig')->willReturn(['client-id' => 'client-id']);
+		$this->client->method('introspectToken')->willReturn((object)['active' => true, 'exp' => \time() + 3600, 'aud' => 'client-id']);
 		$this->client->method('getUserInfo')->willReturn((object)['email' => 'foo@example.com']);
 		$this->cacheFactory->method('create')->willReturn(new ArrayCache());
 		$user = $this->createMock(IUser::class);
@@ -177,6 +177,29 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 
 		$return = $this->authModule->auth($request);
 		self::assertEquals($user, $return);
+	}
+
+	/**
+	 * An opaque token which the introspection endpoint reports as active but
+	 * which was minted for a different client of the same issuer must not
+	 * authenticate anybody (OC10-147).
+	 *
+	 * @throws LoginException
+	 */
+	public function testInvalidTokenWithIntrospectionForeignAudience(): void {
+		$this->client->method('getOpenIdConfig')->willReturn(['client-id' => 'client-id']);
+		$this->client->method('introspectToken')->willReturn((object)['active' => true, 'exp' => \time() + 3600, 'aud' => 'attacker-app']);
+		// the user info has to resolve, otherwise the module would bail out for
+		// that reason instead of on the audience check
+		$this->client->method('getUserInfo')->willReturn((object)['email' => 'foo@example.com']);
+		$this->cacheFactory->method('create')->willReturn(new ArrayCache());
+		$this->lookupService->expects(self::never())->method('lookupUser');
+		$request = $this->createMock(IRequest::class);
+		$request->method('getHeader')->willReturn('Bearer 1234567890');
+		$this->logger->method('logException')->with(new OpenIDConnectClientException('Token audience does not match the configured client-id'));
+
+		$return = $this->authModule->auth($request);
+		self::assertNull($return);
 	}
 
 	/**
