@@ -200,7 +200,16 @@ class Client extends OpenIDConnectClient {
 			$this->logger->error('Token (as per introspection) is inactive: ' . \json_encode($introData, JSON_THROW_ON_ERROR));
 			throw new OpenIDConnectClientException('Token (as per introspection) is inactive');
 		}
-		$this->verifyAudience($introData, $config['client-id'] ?? $this->getClientID());
+		// RFC 7662 §2.2 defines "client_id" as the client the token was issued
+		// to, which is exactly what has to match this relying party. Unlike
+		// RFC 7519, RFC 7662 makes "aud" optional and providers commonly use it
+		// to name the resource server rather than the client, so the audience
+		// claim is only the fallback. Still fail closed: if neither claim
+		// names us - or no client-id is configured - verifyAudience() throws.
+		$clientId = $config['client-id'] ?? $this->getClientID();
+		if ($clientId === null || ($introData->client_id ?? null) !== $clientId) {
+			$this->verifyAudience($introData, $clientId);
+		}
 		return $introData->exp;
 	}
 
