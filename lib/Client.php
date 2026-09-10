@@ -181,6 +181,12 @@ class Client extends OpenIDConnectClient {
 		$tokenExchangeMode = $config['exchange-token-mode-before-introspection'] ?? null;
 
 		if ($tokenExchangeMode) {
+			// NOTE: this deliberately discards the $token argument and verifies
+			// the token held in the OIDC session instead, so the audience check
+			// below binds the exchanged session token - not the token the caller
+			// presented. OpenIdConnectAuthModule::getUserResource() resolves the
+			// identity from the presented token, so both sides have to be kept
+			// in sync when either one changes.
 			$token = $tokenExchangeMode === 'refresh-token' ? $this->session->get('oca.openid-connect.refresh-token') : $this->session->get('oca.openid-connect.access-token');
 			$this->logger->debug("Starting token-exchange to verify session with subject_token mode: $tokenExchangeMode");
 
