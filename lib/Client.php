@@ -181,6 +181,12 @@ class Client extends OpenIDConnectClient {
 		$tokenExchangeMode = $config['exchange-token-mode-before-introspection'] ?? null;
 
 		if ($tokenExchangeMode) {
+			// NOTE: this deliberately discards the $token argument and verifies
+			// the token held in the OIDC session instead, so the audience check
+			// below binds the exchanged session token - not the token the caller
+			// presented. OpenIdConnectAuthModule::getUserResource() resolves the
+			// identity from the presented token, so both sides have to be kept
+			// in sync when either one changes.
 			$token = $tokenExchangeMode === 'refresh-token' ? $this->session->get('oca.openid-connect.refresh-token') : $this->session->get('oca.openid-connect.access-token');
 			$this->logger->debug("Starting token-exchange to verify session with subject_token mode: $tokenExchangeMode");
 
@@ -200,17 +206,30 @@ class Client extends OpenIDConnectClient {
 			$this->logger->error('Token (as per introspection) is inactive: ' . \json_encode($introData, JSON_THROW_ON_ERROR));
 			throw new OpenIDConnectClientException('Token (as per introspection) is inactive');
 		}
+		// RFC 7662 §2.2 defines "client_id" as the client the token was issued
+		// to, which is exactly what has to match this relying party. Unlike
+		// RFC 7519, RFC 7662 makes "aud" optional and providers commonly use it
+		// to name the resource server rather than the client, so the audience
+		// claim is only the fallback. Still fail closed: if neither claim
+		// names us - or no client-id is configured - verifyAudience() throws.
+		$clientId = $config['client-id'] ?? $this->getClientID();
+		if ($clientId === null || ($introData->client_id ?? null) !== $clientId) {
+			$this->verifyAudience($introData, $clientId);
+		}
 		return $introData->exp;
 	}
 
 	/**
 	 * Ensures the token was issued for this relying party by asserting that the
 	 * configured client-id is present in the token's "aud" (audience) claim.
-	 * Without this check a correctly signed token minted by the same issuer for
-	 * a different client would be accepted (see OC10-115). The "aud" claim may
-	 * be a single string or an array of strings per RFC 7519.
+	 * Without this check a token minted by the same issuer for a different
+	 * client would be accepted - either a correctly signed JWT (see OC10-115)
+	 * or an opaque token reported as active by introspection (see OC10-147).
+	 * The "aud" claim may be a single string or an array of strings per
+	 * RFC 7519 and RFC 7662.
 	 *
-	 * @param object $payload the decoded access token payload
+	 * @param object $payload the decoded access token payload or the
+	 *                        introspection response
 	 * @param string|null $clientId the configured relying party client-id
 	 * @throws OpenIDConnectClientException if the audience does not match
 	 */
