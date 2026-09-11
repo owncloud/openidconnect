@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [2.3.5] - 2026-09-11
+
+### Security
+
+- [#356](https://github.com/owncloud/openidconnect/pull/356) - fix: verify token audience to prevent cross-client account takeover
+- [#365](https://github.com/owncloud/openidconnect/pull/365) - fix: verify token audience for introspected opaque tokens
+
+
 ## [2.3.4] - 2026-08-21
 
 ### Security
