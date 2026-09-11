@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] - XXXX-XX-XX
 
+
+## [2.4.2] - 2026-09-11
+
 ### Fixed
 - [#365](https://github.com/owncloud/openidconnect/pull/365) - fix: verify token audience for introspected opaque tokens
 
@@ -140,7 +143,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 - Initial Release
 
-[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.4.1..master
+[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.4.2..master
+[2.4.2]: https://github.com/owncloud/openidconnect/compare/v2.4.1..v2.4.2
 [2.4.1]: https://github.com/owncloud/openidconnect/compare/v2.4.0..v2.4.1
 [2.4.0]: https://github.com/owncloud/openidconnect/compare/v2.3.3..v2.4.0
 [2.3.3]: https://github.com/owncloud/openidconnect/compare/v2.3.2..v2.3.3
