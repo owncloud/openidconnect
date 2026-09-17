@@ -197,7 +197,7 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		$request = $this->createMock(IRequest::class);
 		$request->method('getHeader')->willReturn('Bearer 1234567890');
 		$this->logger->expects(self::once())->method('logException')
-			->with(new OpenIDConnectClientException('Token audience does not match the configured client-id'));
+			->with(new OpenIDConnectClientException('Token audience does not match the expected audience'));
 
 		$return = $this->authModule->auth($request);
 		self::assertNull($return);

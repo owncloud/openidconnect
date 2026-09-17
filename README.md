@@ -32,6 +32,46 @@ occ config:app:set openidconnect openid-connect \
   --value='{"provider-url":"https://idp.example.net","client-id":"your-client-id","client-secret":"your-secret","loginButtonName":"Login via OpenId Connect"}'
 ```
 
+#### Access token audience
+
+An access token is accepted only if it names this relying party. By default that
+means its `aud` claim carries the configured `client-id`, which is what most
+providers send - or, for an opaque token, that introspection reports a
+`client_id` of ours, since RFC 7662 leaves `aud` optional. Providers that address
+the *resource server* instead - AD FS is the common case - send neither, and need
+the optional `audience` key to declare what they actually put in `aud`:
+
+```json
+{"provider-url":"https://adfs.example.com/adfs","client-id":"your-client-id","client-secret":"your-secret","audience":"microsoft:identityserver:your-client-id"}
+```
+
+`audience` takes a single string or a list of strings, and replaces the
+`client-id` as the expected value rather than adding to it. For AD FS, read the
+value off `Get-AdfsRelyingPartyTrust`: the identifier is prefixed with
+`microsoft:identityserver:` unless it is a URL, in which case it is sent
+verbatim. The value must match exactly, including case.
+
+Setting it makes `aud` authoritative, which cuts both ways. A token issued to
+this client for some *other* resource is now rejected, because the introspection
+`client_id` shortcut above no longer applies. But a token issued to a *different*
+client of the same IdP is accepted if its `aud` names us - which is the standard
+resource-server model, and the only thing that can work when the client-id never
+appears in `aud`. So pick a value that only ownCloud's relying party can be issued
+for, and do not reuse it across clients.
+
+Two further notes:
+
+- Do **not** set `audience` if your token introspection response omits `aud`.
+  RFC 7662 allows that, and since setting it makes `aud` authoritative, every
+  opaque token would then be rejected.
+- With `exchange-token-mode-before-introspection`, the first entry is also what
+  the token exchange asks the IdP for, so list the resource ownCloud should be
+  given first.
+
+See the
+[admin manual](https://doc.owncloud.com/server/latest/admin_manual/configuration/user/oidc/index.html)
+for the full parameter reference.
+
 ### Run Tests
 
 ```bash

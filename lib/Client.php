@@ -46,6 +46,13 @@ class Client extends OpenIDConnectClient {
 	 */
 	private $generator;
 	private IClientService $clientService;
+	/**
+	 * getExpectedAudiences() runs more than once per request, so the config
+	 * complaint it can raise is reported only the first time.
+	 *
+	 * @var bool
+	 */
+	private $unusableAudienceReported = false;
 
 	/**
 	 * Client constructor.
@@ -169,7 +176,17 @@ class Client extends OpenIDConnectClient {
 				$this->logger->error('Token cannot be verified: ' . $token);
 				throw new OpenIDConnectClientException('Token cannot be verified.');
 			}
-			$this->verifyAudience($payload, $config['client-id'] ?? $this->getClientID());
+			// Deliberately NOT symmetrical with the introspection branch below.
+			// That one may fall back to RFC 7662 "client_id" because RFC 7662
+			// makes "aud" optional; RFC 9068 §2.2 makes "aud" REQUIRED in a JWT
+			// access token, so there is no conformant provider that needs the
+			// fallback here. It would also cost us: every claim in this branch
+			// arrives inside the caller's own request rather than from an
+			// authenticated back-channel call, and honouring "client_id" would
+			// accept a token this client legitimately obtained for a *different*
+			// resource (RFC 8707, RFC 8693) and had replayed at ownCloud. See #373.
+			$clientId = $config['client-id'] ?? $this->getClientID();
+			$this->verifyAudience($payload, $this->getExpectedAudiences($config, $clientId));
 			$this->logger->debug('Access token payload: ' . \json_encode($payload, JSON_THROW_ON_ERROR));
 			/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
 			return $payload->exp;
@@ -212,16 +229,75 @@ class Client extends OpenIDConnectClient {
 		// to name the resource server rather than the client, so the audience
 		// claim is only the fallback. Still fail closed: if neither claim
 		// names us - or no client-id is configured - verifyAudience() throws.
+		//
+		// Unless "audience" is configured. Then the admin has told us what "aud"
+		// holds, so it is no longer unreliable and becomes authoritative: taking
+		// the "client_id" shortcut here would accept a token this client
+		// obtained for a *different* resource, which is the same replay the JWT
+		// branch above refuses to allow.
 		$clientId = $config['client-id'] ?? $this->getClientID();
-		if ($clientId === null || ($introData->client_id ?? null) !== $clientId) {
-			$this->verifyAudience($introData, $clientId);
+		if (isset($config['audience'])
+			|| $clientId === null
+			|| ($introData->client_id ?? null) !== $clientId
+		) {
+			$this->verifyAudience($introData, $this->getExpectedAudiences($config, $clientId));
 		}
 		return $introData->exp;
 	}
 
 	/**
-	 * Ensures the token was issued for this relying party by asserting that the
-	 * configured client-id is present in the token's "aud" (audience) claim.
+	 * The audience value(s) an access token must carry to be accepted for this
+	 * relying party.
+	 *
+	 * Defaults to the configured client-id, which is what a spec compliant
+	 * provider puts into an *ID token's* "aud" (OpenID Connect Core 1.0 §2). An
+	 * access token is a different thing: RFC 9068 §3 defines its "aud" as the
+	 * resource server, not the client. Providers that address the resource
+	 * therefore never send the client-id, and need the "audience" config key to
+	 * declare what they do send. AD FS is the common case - it renders the
+	 * relying party identifier as "microsoft:identityserver:<identifier>" unless
+	 * that identifier is a URL, in which case it is sent verbatim.
+	 *
+	 * @param array|null $config the openid-connect config
+	 * @param string|null $clientId the configured relying party client-id
+	 * @return string[] only non-empty strings; an empty array means no token can
+	 *                  be accepted, which is what a broken "audience" value must
+	 *                  degrade to
+	 */
+	private function getExpectedAudiences(?array $config, ?string $clientId): array {
+		$configured = $config['audience'] ?? $clientId;
+		if (!\is_array($configured)) {
+			$configured = [$configured];
+		}
+		// Anything that is not a usable audience string is a misconfiguration and
+		// must not silently widen the check - an empty string in particular would
+		// otherwise match a token carrying an empty "aud".
+		$expected = \array_values(\array_filter($configured, static function ($audience) {
+			return \is_string($audience) && $audience !== '';
+		}));
+		// An empty result rejects every token, so say why: otherwise the only
+		// symptom of a JSON number, a bool or an empty list here is a site-wide
+		// auth outage whose log line reads like an attack rather than a typo.
+		// Both halves are needed - "audience": [] drops nothing yet still leaves
+		// nothing to match, which is the case that most needs explaining.
+		if (isset($config['audience'])
+			&& ($expected === [] || \count($expected) !== \count($configured))
+			&& !$this->unusableAudienceReported
+		) {
+			$this->unusableAudienceReported = true;
+			$this->logger->warning(\sprintf(
+				$expected === []
+					? 'No usable "audience" in the openid-connect config, only non-empty strings are accepted, so every access token will be rejected: %s'
+					: 'Ignoring unusable "audience" values in the openid-connect config, only non-empty strings are accepted: %s',
+				\json_encode($config['audience'])
+			));
+		}
+		return $expected;
+	}
+
+	/**
+	 * Ensures the token was issued for this relying party by asserting that one
+	 * of the expected audiences is present in the token's "aud" claim.
 	 * Without this check a token minted by the same issuer for a different
 	 * client would be accepted - either a correctly signed JWT (see OC10-115)
 	 * or an opaque token reported as active by introspection (see OC10-147).
@@ -230,16 +306,25 @@ class Client extends OpenIDConnectClient {
 	 *
 	 * @param object $payload the decoded access token payload or the
 	 *                        introspection response
-	 * @param string|null $clientId the configured relying party client-id
+	 * @param string[] $expectedAudiences as returned by getExpectedAudiences()
 	 * @throws OpenIDConnectClientException if the audience does not match
 	 */
-	private function verifyAudience(object $payload, ?string $clientId): void {
+	private function verifyAudience(object $payload, array $expectedAudiences): void {
 		$audience = $payload->aud ?? null;
 		$audiences = \is_array($audience) ? $audience : [$audience];
-		if ($clientId === null || !\in_array($clientId, $audiences, true)) {
-			$this->logger->error('Token audience does not match the configured client-id: ' . \json_encode($audience));
-			throw new OpenIDConnectClientException('Token audience does not match the configured client-id');
+		foreach ($expectedAudiences as $expected) {
+			// strict, and deliberately not \array_intersect(): that compares
+			// loosely, so 0 would match "0", and it string-casts a nested array.
+			if (\in_array($expected, $audiences, true)) {
+				return;
+			}
 		}
+		$this->logger->error(\sprintf(
+			'Token audience does not match the expected audience: token "aud" is %s, expected one of %s',
+			\json_encode($audience),
+			\json_encode($expectedAudiences)
+		));
+		throw new OpenIDConnectClientException('Token audience does not match the expected audience');
 	}
 
 	public function introspectToken($token, $token_type_hint = '', $clientId = null, $clientSecret = null) {
@@ -334,7 +419,15 @@ class Client extends OpenIDConnectClient {
 	 */
 	public function exchangeToken(string $subjectToken, string $tokenType): string {
 		$subjectTokenType = $tokenType === 'refresh-token' ? 'urn:ietf:params:oauth:token-type:refresh_token' : 'urn:ietf:params:oauth:token-type:access_token';
-		$exchangeResponse = $this->requestTokenExchange($subjectToken, $subjectTokenType, $this->getClientID());
+		// Ask for a token whose "aud" is what verifyToken() will then expect. This
+		// used to request the client-id, which is the same value while "audience"
+		// is unset; without this, setting "audience" would make the exchanged
+		// token fail the very check it has to pass. An empty string makes the
+		// library omit the parameter, which is also the safe landing spot when no
+		// client-id is configured - the old code passed null into a string param.
+		$config = $this->getOpenIdConfig();
+		$audience = $this->getExpectedAudiences($config, $config['client-id'] ?? $this->getClientID())[0] ?? '';
+		$exchangeResponse = $this->requestTokenExchange($subjectToken, $subjectTokenType, $audience);
 
 		if (isset($exchangeResponse->error)) {
 			if (isset($exchangeResponse->error_description)) {
