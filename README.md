@@ -47,9 +47,11 @@ the optional `audience` key to declare what they actually put in `aud`:
 
 `audience` takes a single string or a list of strings, and replaces the
 `client-id` as the expected value rather than adding to it. For AD FS, read the
-value off `Get-AdfsRelyingPartyTrust`: the identifier is prefixed with
-`microsoft:identityserver:` unless it is a URL, in which case it is sent
-verbatim. The value must match exactly, including case.
+application identifier off `Get-AdfsWebApiApplication` (an OpenID Connect
+application group) or `Get-AdfsRelyingPartyTrust` (a legacy WS-Federation or SAML
+trust): AD FS prefixes it with `microsoft:identityserver:` unless it is already a
+URL, in which case it is sent verbatim. The value must match exactly, including
+case.
 
 Setting it makes `aud` authoritative, which cuts both ways. A token issued to
 this client for some *other* resource is now rejected, because the introspection
