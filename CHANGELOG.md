@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 - [#356](https://github.com/owncloud/openidconnect/pull/356) - fix: verify token audience to prevent cross-client account takeover
 - [#365](https://github.com/owncloud/openidconnect/pull/365) - fix: verify token audience for introspected opaque tokens
 
+### Fixed
+
+- [#374](https://github.com/owncloud/openidconnect/pull/374) - fix: let the expected access token audience be configured
+
 
 ## [2.3.4] - 2026-08-21
 

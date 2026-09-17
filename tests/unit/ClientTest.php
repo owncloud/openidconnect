@@ -281,7 +281,7 @@ class ClientTest extends TestCase {
 
 		if (!$expectValid) {
 			$this->expectException(OpenIDConnectClientException::class);
-			$this->expectExceptionMessage('Token audience does not match the configured client-id');
+			$this->expectExceptionMessage('Token audience does not match the expected audience');
 		}
 
 		$exp = $this->client->verifyToken('some-token');
@@ -327,7 +327,7 @@ class ClientTest extends TestCase {
 
 		if (!$expectValid) {
 			$this->expectException(OpenIDConnectClientException::class);
-			$this->expectExceptionMessage('Token audience does not match the configured client-id');
+			$this->expectExceptionMessage('Token audience does not match the expected audience');
 		}
 
 		$exp = $this->client->verifyToken('opaque-token');
@@ -401,7 +401,7 @@ class ClientTest extends TestCase {
 
 		if (!$expectValid) {
 			$this->expectException(OpenIDConnectClientException::class);
-			$this->expectExceptionMessage('Token audience does not match the configured client-id');
+			$this->expectExceptionMessage('Token audience does not match the expected audience');
 		}
 
 		$exp = $this->client->verifyToken('opaque-token');
@@ -409,5 +409,479 @@ class ClientTest extends TestCase {
 		if ($expectValid) {
 			self::assertEquals($introspectionData['exp'], $exp);
 		}
+	}
+
+	/**
+	 * Builds a client whose access token looks like a JWT, so verifyToken() takes
+	 * its JWT branch.
+	 *
+	 * @param array $openIdConfig the openid-connect config
+	 * @param array $payload the decoded access token payload
+	 * @return Client
+	 */
+	private function buildClientForJwt(array $openIdConfig, array $payload): Client {
+		$this->config->method('getSystemValue')->willReturnCallback(
+			static function ($key) use ($openIdConfig) {
+				return $key === 'openid-connect' ? $openIdConfig : null;
+			}
+		);
+		$client = $this->getMockBuilder(Client::class)
+			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger, $this->clientService])
+			->onlyMethods(['getAccessTokenPayload', 'verifyJWTsignature', 'setAccessToken'])
+			->getMock();
+		$client->method('setAccessToken');
+		$client->method('getAccessTokenPayload')->willReturn((object)$payload);
+		$client->method('verifyJWTsignature')->willReturn(true);
+		return $client;
+	}
+
+	/**
+	 * Builds a client whose access token is opaque, so verifyToken() takes its
+	 * introspection branch.
+	 *
+	 * @param array $openIdConfig the openid-connect config
+	 * @param array $introspectionData the introspection response
+	 * @return Client
+	 */
+	private function buildClientForIntrospection(array $openIdConfig, array $introspectionData): Client {
+		$this->config->method('getSystemValue')->willReturnCallback(
+			static function ($key) use ($openIdConfig) {
+				return $key === 'openid-connect' ? $openIdConfig : null;
+			}
+		);
+		$client = $this->getMockBuilder(Client::class)
+			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger, $this->clientService])
+			->onlyMethods(['getAccessTokenPayload', 'setAccessToken', 'introspectToken'])
+			->getMock();
+		$client->method('setAccessToken');
+		// an opaque token has no JWT payload - this is what forces the
+		// introspection branch of verifyToken
+		$client->method('getAccessTokenPayload')->willReturn(null);
+		$client->method('introspectToken')->willReturn((object)$introspectionData);
+		return $client;
+	}
+
+	public function providesConfiguredAudienceData(): array {
+		return [
+			// the reported AD FS shape: the relying party identifier is not a URL,
+			// so AD FS prefixes it and the client-id never appears in "aud" (#373)
+			'audience matches the AD FS resource identifier' => [
+				'microsoft:identityserver:owncloud-client', 'microsoft:identityserver:owncloud-client', true
+			],
+			'audience is one of several in the aud array' => [
+				'microsoft:identityserver:owncloud-client',
+				['microsoft:identityserver:owncloud-client', 'urn:microsoft:userinfo'],
+				true
+			],
+			// "audience" replaces the client-id rather than adding to it
+			'configured audience replaces the client-id' => [
+				'microsoft:identityserver:owncloud-client', 'owncloud-client', false
+			],
+			'audience list, aud matches a later entry' => [['resource-a', 'resource-b'], 'resource-b', true],
+			'audience list, aud matches nothing' => [['resource-a', 'resource-b'], 'resource-c', false],
+			// a broken "audience" must fail closed, never accept everything
+			'audience is an empty list' => [[], 'owncloud-client', false],
+			'audience is an empty string' => ['', '', false],
+			'audience list holds only an empty string' => [[''], '', false],
+			// a non-string is not a usable audience, so it is dropped and nothing
+			// is left to match against
+			'audience is not a string' => [123, '123', false],
+			// strict comparison, on the token side which is not filtered: a loose
+			// one would accept this, since PHP evaluates '0' == 0 as true
+			'aud is the numeric form of the audience' => ['0', 0, false],
+			'audience is set but aud is missing' => ['resource-a', null, false],
+			// the value has to be copied exactly
+			'audience differs only in case' => ['Resource-A', 'resource-a', false],
+		];
+	}
+
+	/**
+	 * @dataProvider providesConfiguredAudienceData
+	 * @param string|array|int $configuredAudience
+	 * @param string|array|null $aud
+	 * @param bool $expectValid
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenConfiguredAudience($configuredAudience, $aud, bool $expectValid): void {
+		$payload = ['exp' => \time() + 3600];
+		if ($aud !== null) {
+			$payload['aud'] = $aud;
+		}
+
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+			'audience' => $configuredAudience,
+		], $payload);
+
+		if (!$expectValid) {
+			$this->expectException(OpenIDConnectClientException::class);
+			$this->expectExceptionMessage('Token audience does not match the expected audience');
+		}
+
+		$exp = $this->client->verifyToken('some-token');
+
+		if ($expectValid) {
+			self::assertEquals($payload['exp'], $exp);
+		}
+	}
+
+	/**
+	 * Both branches of verifyToken() have to honour the same expected audiences.
+	 *
+	 * @dataProvider providesConfiguredAudienceData
+	 * @param string|array|int $configuredAudience
+	 * @param string|array|null $aud
+	 * @param bool $expectValid
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenIntrospectionConfiguredAudience($configuredAudience, $aud, bool $expectValid): void {
+		$introspectionData = ['active' => true, 'exp' => \time() + 3600];
+		if ($aud !== null) {
+			$introspectionData['aud'] = $aud;
+		}
+
+		$this->client = $this->buildClientForIntrospection([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+			'audience' => $configuredAudience,
+		], $introspectionData);
+
+		if (!$expectValid) {
+			$this->expectException(OpenIDConnectClientException::class);
+			$this->expectExceptionMessage('Token audience does not match the expected audience');
+		}
+
+		$exp = $this->client->verifyToken('opaque-token');
+
+		if ($expectValid) {
+			self::assertEquals($introspectionData['exp'], $exp);
+		}
+	}
+
+	/**
+	 * Configuring "audience" makes the audience authoritative on the
+	 * introspection path too. The RFC 7662 "client_id" shortcut exists only
+	 * because "aud" is optional there and cannot be relied on - once the admin
+	 * has said what "aud" holds, it can, and the shortcut must not wave through a
+	 * token this client obtained for a different resource. Otherwise the resource
+	 * binding the admin just configured is silently unenforced for opaque tokens.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenIntrospectionConfiguredAudienceBeatsClientId(): void {
+		$this->client = $this->buildClientForIntrospection([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+			'audience' => 'https://oc.example.com',
+		], [
+			'active' => true,
+			'exp' => \time() + 3600,
+			// issued to us as a client ...
+			'client_id' => 'owncloud-client',
+			// ... but addressed at a different resource server
+			'aud' => 'https://other-api.example.com',
+		]);
+
+		$this->expectException(OpenIDConnectClientException::class);
+		$this->expectExceptionMessage('Token audience does not match the expected audience');
+
+		$this->client->verifyToken('opaque-token');
+	}
+
+	/**
+	 * The flip side: with "audience" configured and satisfied, the token is
+	 * accepted no matter which client it was issued to.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenIntrospectionConfiguredAudienceIgnoresClientId(): void {
+		$introspectionData = [
+			'active' => true,
+			'exp' => \time() + 3600,
+			'client_id' => 'somebody-else',
+			'aud' => 'https://oc.example.com',
+		];
+		$this->client = $this->buildClientForIntrospection([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+			'audience' => 'https://oc.example.com',
+		], $introspectionData);
+
+		self::assertEquals($introspectionData['exp'], $this->client->verifyToken('opaque-token'));
+	}
+
+	/**
+	 * Each row is [configured "audience", expected log wording, rejects everything?].
+	 * The wording has to distinguish the two cases: "no usable audience" locks the
+	 * instance out entirely, whereas dropping one entry of several does not, and an
+	 * admin grepping logs during an incident must be able to tell them apart.
+	 *
+	 * @return array
+	 */
+	public function providesUnusableAudienceData(): array {
+		return [
+			// nothing is dropped here - the list is simply empty - so this is the
+			// case a "did we drop anything?" check alone would miss
+			'empty list' => [[], 'No usable "audience"', true],
+			'JSON number' => [123, 'No usable "audience"', true],
+			'bool' => [true, 'No usable "audience"', true],
+			'empty string' => ['', 'No usable "audience"', true],
+			// one usable value survives, so tokens still work - say so, and do not
+			// claim there is no usable audience
+			'one good value, one unusable' => [['resource-a', 7], 'Ignoring unusable "audience" values', false],
+		];
+	}
+
+	/**
+	 * An unusable "audience" has to be reported as the configuration error it is -
+	 * the rejection alone reads like an attack rather than a typo.
+	 *
+	 * @dataProvider providesUnusableAudienceData
+	 * @param string|array|int|bool $configuredAudience
+	 * @param string $expectedWording
+	 * @param bool $expectRejection
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testUnusableAudienceIsReported(
+		$configuredAudience,
+		string $expectedWording,
+		bool $expectRejection
+	): void {
+		$this->logger->expects(self::once())
+			->method('warning')
+			->with(self::stringContains($expectedWording));
+
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+			'audience' => $configuredAudience,
+		], ['exp' => \time() + 3600, 'aud' => 'resource-a']);
+
+		if ($expectRejection) {
+			$this->expectException(OpenIDConnectClientException::class);
+		}
+		$this->client->verifyToken('some-token');
+	}
+
+	/**
+	 * The config complaint is raised once per client instance, not once per call.
+	 * The Client is a per-request singleton and getExpectedAudiences() runs more
+	 * than once per request (twice with exchange-token mode), so without the guard
+	 * a misconfigured audience would repeat itself in the log on every request.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testUnusableAudienceIsReportedOnlyOnce(): void {
+		$this->logger->expects(self::once())->method('warning');
+
+		$payload = ['exp' => \time() + 3600, 'aud' => 'resource-a'];
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+			// keeps one usable value, so neither call throws and both reach the
+			// warning site
+			'audience' => ['resource-a', 7],
+		], $payload);
+
+		self::assertEquals($payload['exp'], $this->client->verifyToken('some-token'));
+		self::assertEquals($payload['exp'], $this->client->verifyToken('some-token'));
+	}
+
+	/**
+	 * A well-formed "audience" must not produce a configuration complaint.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testUsableAudienceIsNotReported(): void {
+		$this->logger->expects(self::never())->method('warning');
+
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+			'audience' => ['resource-a', 'resource-b'],
+		], ['exp' => \time() + 3600, 'aud' => 'resource-b']);
+
+		$this->client->verifyToken('some-token');
+	}
+
+	/**
+	 * The JWT branch is deliberately NOT symmetrical with the introspection
+	 * branch: it must never accept a token on the strength of its "client_id"
+	 * claim. RFC 9068 §2.2 makes "aud" REQUIRED in a JWT access token, so no
+	 * conformant provider needs that fallback, and honouring it would accept a
+	 * token this client legitimately obtained for a different resource
+	 * (RFC 8707, RFC 8693) and had replayed here. Pins the decision on #373 so a
+	 * later "make the branches symmetrical" refactor cannot quietly undo it.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtIgnoresClientIdClaim(): void {
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], [
+			'exp' => \time() + 3600,
+			// names us as the client the token was issued to ...
+			'client_id' => 'owncloud-client',
+			// ... but the token is addressed at somebody else
+			'aud' => 'attacker-app',
+		]);
+
+		$this->expectException(OpenIDConnectClientException::class);
+		$this->expectExceptionMessage('Token audience does not match the expected audience');
+
+		$this->client->verifyToken('some-token');
+	}
+
+	/**
+	 * The JWT-branch counterpart of the introspection branch's
+	 * 'no client-id configured, no claim names us' case: with nothing to compare
+	 * against, an unverifiable token must be rejected and not slip through on a
+	 * null-equals-null comparison.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtWithoutClientIdOrAudience(): void {
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => null,
+			'client-secret' => 'secret',
+		], ['exp' => \time() + 3600]);
+
+		$this->expectException(OpenIDConnectClientException::class);
+		$this->expectExceptionMessage('Token audience does not match the expected audience');
+
+		$this->client->verifyToken('some-token');
+	}
+
+	/**
+	 * "audience" is usable on its own, so a deployment that identifies itself
+	 * only by resource does not have to configure a client-id to be verifiable.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenAudienceWithoutClientId(): void {
+		$payload = ['exp' => \time() + 3600, 'aud' => 'resource-a'];
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => null,
+			'client-secret' => 'secret',
+			'audience' => 'resource-a',
+		], $payload);
+
+		self::assertEquals($payload['exp'], $this->client->verifyToken('some-token'));
+	}
+
+	/**
+	 * An "aud" of [] is what Ory Hydra emits when a token is addressed at nobody;
+	 * it must not be read as "addressed at everybody".
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenEmptyAudienceArray(): void {
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], ['exp' => \time() + 3600, 'aud' => []]);
+
+		$this->expectException(OpenIDConnectClientException::class);
+		$this->expectExceptionMessage('Token audience does not match the expected audience');
+
+		$this->client->verifyToken('some-token');
+	}
+
+	public function providesExchangeTokenAudienceData(): array {
+		return [
+			'no audience configured falls back to the client-id' => [null, 'owncloud-client'],
+			'the configured audience is requested' => [
+				'microsoft:identityserver:owncloud-client', 'microsoft:identityserver:owncloud-client'
+			],
+			'the first entry of an audience list is requested' => [['resource-a', 'resource-b'], 'resource-a'],
+			// nothing usable to ask for; an empty string makes the library omit the
+			// parameter rather than sending a bogus one
+			'an empty audience asks for nothing' => [[], ''],
+		];
+	}
+
+	/**
+	 * The exchanged token has to pass the same audience check verifyToken()
+	 * applies, so the exchange must ask for the configured audience. Requesting
+	 * the client-id - as this did before "audience" existed - would make the
+	 * exchanged token fail the very check it has to pass.
+	 *
+	 * @dataProvider providesExchangeTokenAudienceData
+	 * @param string|array|null $configuredAudience
+	 * @param string $expectedRequestedAudience
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testExchangeTokenRequestsExpectedAudience(
+		$configuredAudience,
+		string $expectedRequestedAudience
+	): void {
+		$openIdConfig = [
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		];
+		if ($configuredAudience !== null) {
+			$openIdConfig['audience'] = $configuredAudience;
+		}
+		$this->config->method('getSystemValue')->willReturnCallback(
+			static function ($key) use ($openIdConfig) {
+				return $key === 'openid-connect' ? $openIdConfig : null;
+			}
+		);
+
+		$client = $this->getMockBuilder(Client::class)
+			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger, $this->clientService])
+			->onlyMethods(['requestTokenExchange'])
+			->getMock();
+		$client->expects(self::once())
+			->method('requestTokenExchange')
+			->with('subject-token', 'urn:ietf:params:oauth:token-type:access_token', $expectedRequestedAudience)
+			->willReturn((object)['access_token' => 'exchanged-token']);
+
+		self::assertEquals('exchanged-token', $client->exchangeToken('subject-token', 'access-token'));
+	}
+
+	/**
+	 * A nested "aud" must be rejected without emitting an "Array to string
+	 * conversion" warning - which is what \array_intersect() would have done.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenNestedAudience(): void {
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], ['exp' => \time() + 3600, 'aud' => [['owncloud-client']]]);
+
+		$this->expectException(OpenIDConnectClientException::class);
+		$this->expectExceptionMessage('Token audience does not match the expected audience');
+
+		$this->client->verifyToken('some-token');
 	}
 }
