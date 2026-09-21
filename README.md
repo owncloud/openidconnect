@@ -49,10 +49,11 @@ token the provider signed, and it names the client that asked for it.
 Regardless of audience, a token that declares itself *not* to be an access token is
 refused - `typ` of `Refresh` or `Offline` (Keycloak), `token_use` of `refresh` (AWS
 Cognito) - because a refresh token is long-lived and kept at rest, and must not
-double as a bearer credential. ID tokens are **not** covered by that rule: an ID
-token's `aud` is the `client-id` by definition, so one presented as a bearer token
-is accepted. If your clients can obtain ID tokens, treat them as credentials
-accordingly.
+double as a bearer credential. ID tokens carry no such marker, and an ID token's
+`aud` *is* the `client-id`, so one presented as a bearer token is accepted for as
+long as the `client-id` is an accepted audience; setting `audience` to anything else
+rejects them as a side effect. Where that is not an option, treat ID tokens as
+credentials.
 
 For anything stronger, declare what your provider actually puts in `aud` with the
 optional `audience` key - which then becomes the only thing accepted:
@@ -69,25 +70,25 @@ trust): AD FS prefixes it with `microsoft:identityserver:` unless it is already 
 URL, in which case it is sent verbatim. The value must match exactly, including
 case.
 
-Setting it makes `aud` authoritative, which cuts both ways. A token issued to this
-client for some *other* resource is now rejected, because the client-naming claims
-above are no longer consulted - that is the reason to set it. But a token issued to
-a *different* client of the same IdP is accepted if its `aud` names us, which is
-the standard resource-server model and the only thing that can work when the
-client-id never appears in `aud`. So pick a value that only ownCloud's relying
-party can be issued for, and do not reuse it across clients.
+Setting it makes `aud` authoritative, which buys one thing and not another.
 
-Leaving it unset covers the case the check was added for - a token an attacker
-obtained for their own client, addressed at their own client, does not pass - but it
-cannot distinguish *resources*: a token this client obtained for another resource is
-accepted, and so is one another client was issued *for our resource*, since `aud`
-naming us is enough (as it was before this key existed, and as the resource-server
-model intends). Note that another client of the same IdP can often get our identifier
-into `aud` deliberately - an audience mapper on their own client, or an RFC 8707
-`resource` parameter - so if your IdP hands out tokens for several resources, or lets
-other clients request yours, set `audience`.
-Keycloak's stock client is the one shape where there is nothing to set: with no `aud`
-claim at all, no value can match, so either add a Keycloak audience mapper for the
+It buys a binding to the *resource*: a token this client obtained for some other
+resource of the same IdP - through an RFC 8707 `resource` parameter, or RFC 8693
+token exchange - no longer authenticates here, because the client-naming claims are
+no longer consulted. Set it if your IdP issues tokens to ownCloud's client for more
+than one resource.
+
+It does not keep another *client's* tokens out. A token whose `aud` names us is
+accepted whichever client requested it, with or without this key, and a client of the
+same IdP can often be granted exactly that - an audience mapper of its own, or a
+`resource` parameter naming us. That is the resource-server model, and the only place
+to control it is the IdP. So pick a value that only ownCloud's relying party can be
+issued for, and do not reuse it across clients.
+
+Leaving it unset still refuses what the check was added for: a token an attacker
+obtained for their own client, addressed at their own client, does not pass. And
+Keycloak's stock client is one shape where there is nothing to set at all - with no
+`aud` claim, no value can match, so either add a Keycloak audience mapper for the
 client-id or rely on `azp`.
 
 Two further notes:
