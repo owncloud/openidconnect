@@ -675,6 +675,30 @@ class ClientTest extends TestCase {
 	}
 
 	/**
+	 * Every audience the admin is asked to recognise or copy is logged with its
+	 * slashes intact - `api:\/\/owncloud` is not what they put in the config, and
+	 * not what their provider sent either.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testUnusableAudienceIsReportedWithReadableSlashes(): void {
+		$this->logger->expects(self::once())
+			->method('warning')
+			->with(self::stringContains('"api://owncloud"'));
+
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+			// one usable value so the call does not throw before reaching the log
+			'audience' => ['api://owncloud', 7],
+		], ['exp' => \time() + 3600, 'aud' => 'api://owncloud']);
+
+		$this->client->verifyToken('some-token');
+	}
+
+	/**
 	 * The config complaint is raised once per client instance, not once per call.
 	 * The Client is a per-request singleton and getExpectedAudiences() runs more
 	 * than once per request (twice with exchange-token mode), so without the guard
@@ -880,7 +904,10 @@ class ClientTest extends TestCase {
 				self::stringContains('appid'),
 				self::stringContains('audience'),
 				// the value the admin would copy into the config
-				self::stringContains('api://owncloud-client')
+				self::stringContains('api://owncloud-client'),
+				// ... and the caveat that stops them copying a value shared with
+				// every other client of the same IdP, which would re-open OC10-115
+				self::stringContains('only ownCloud')
 			));
 
 		$payload = [
@@ -895,6 +922,151 @@ class ClientTest extends TestCase {
 		], $payload);
 
 		self::assertEquals($payload['exp'], $this->client->verifyToken('some-token'));
+		self::assertEquals($payload['exp'], $this->client->verifyToken('some-token'));
+	}
+
+	/**
+	 * @return array<string, array{string, string}>
+	 */
+	public function providesNonAccessTokenMarkers(): array {
+		return [
+			// Keycloak: "typ" is "Bearer" on an access token, "Refresh" on a
+			// refresh token and "Offline" on an offline token (observed, 26.0)
+			'keycloak refresh' => ['typ', 'Refresh'],
+			'keycloak offline' => ['typ', 'Offline'],
+			// casing is the provider's choice, ours is to not depend on it
+			'lowercase' => ['typ', 'refresh'],
+			// AWS Cognito marks the same thing with "token_use"
+			'token_use' => ['token_use', 'refresh'],
+		];
+	}
+
+	/**
+	 * A token that says of itself that it is a refresh token must not authenticate,
+	 * however well its claims match. Keycloak signs
+	 * refresh tokens with an HMAC key that is not in the published JWKS, so
+	 * verifyJWTsignature() already rejects them there - but that is a property of
+	 * one provider's defaults, not something this code can rely on.
+	 *
+	 * @dataProvider providesNonAccessTokenMarkers
+	 * @param string $claim
+	 * @param string $value
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtRejectsRefreshTokenOnClientNamingClaim(
+		string $claim,
+		string $value
+	): void {
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], [
+			'exp' => \time() + 3600,
+			'aud' => 'https://example.net/realms/oc',
+			'azp' => 'owncloud-client',
+			$claim => $value,
+		]);
+
+		$this->expectException(OpenIDConnectClientException::class);
+		$this->expectExceptionMessage('Token is not an access token');
+
+		$this->client->verifyToken('some-token');
+	}
+
+	/**
+	 * The shapes where the audience alone would have let a refresh token through,
+	 * which is why the marker is checked before the audience and regardless of
+	 * configuration: a provider whose refresh tokens carry the expected audience -
+	 * the client-id by default, or whatever "audience" declares - would otherwise
+	 * have them accepted by the comparison, never reaching the marker at all.
+	 *
+	 * @dataProvider providesRefreshTokensCarryingAnAcceptedAudience
+	 * @param array<string, mixed> $config
+	 * @param mixed $aud
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtRejectsRefreshTokenCarryingAnAcceptedAudience(
+		array $config,
+		$aud
+	): void {
+		$this->client = $this->buildClientForJwt(
+			\array_merge([
+				'provider-url' => 'https://example.net',
+				'client-id' => 'owncloud-client',
+				'client-secret' => 'secret',
+			], $config),
+			['exp' => \time() + 3600, 'aud' => $aud, 'typ' => 'Refresh']
+		);
+
+		$this->expectException(OpenIDConnectClientException::class);
+		$this->expectExceptionMessage('Token is not an access token');
+
+		$this->client->verifyToken('some-token');
+	}
+
+	/**
+	 * @return array<string, array{array<string, mixed>, mixed}>
+	 */
+	public function providesRefreshTokensCarryingAnAcceptedAudience(): array {
+		return [
+			// nothing configured, so the client-id is expected - and this refresh
+			// token carries it
+			'aud is the client-id' => [[], 'owncloud-client'],
+			// the Okta shape: "audience" is configured and the refresh token
+			// carries exactly that value
+			'aud is the configured audience' => [['audience' => 'api://default'], 'api://default'],
+		];
+	}
+
+	/**
+	 * The same guard on the introspection branch, where a refresh token is the more
+	 * likely thing to be presented: RFC 7662 puts no token type in the response, so
+	 * a marker claim is all there is to go on.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenIntrospectionRejectsRefreshToken(): void {
+		$this->client = $this->buildClientForIntrospection([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], [
+			'active' => true,
+			'exp' => \time() + 3600,
+			'aud' => 'owncloud-client',
+			'client_id' => 'owncloud-client',
+			'token_use' => 'refresh',
+		]);
+
+		$this->expectException(OpenIDConnectClientException::class);
+		$this->expectExceptionMessage('Token is not an access token');
+
+		$this->client->verifyToken('some-opaque-token');
+	}
+
+	/**
+	 * The access-token marker of the same providers must keep working - "Bearer"
+	 * is what Keycloak puts on the token this fallback exists for.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtAcceptsBearerTypeOnClientNamingClaim(): void {
+		$payload = [
+			'exp' => \time() + 3600,
+			'typ' => 'Bearer',
+			'azp' => 'owncloud-client',
+		];
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], $payload);
+
 		self::assertEquals($payload['exp'], $this->client->verifyToken('some-token'));
 	}
 

@@ -184,7 +184,7 @@ class Client extends OpenIDConnectClient {
 				throw new OpenIDConnectClientException('Token cannot be verified.');
 			}
 			$clientId = $config['client-id'] ?? $this->getClientID();
-			$this->verifyAudience($payload, $this->getExpectedAudiences($config, $clientId), $config, $clientId);
+			$this->verifyAudience($payload, $this->getExpectedAudiences($config, $clientId), isset($config['audience']), $clientId);
 			$this->logger->debug('Access token payload: ' . \json_encode($payload, JSON_THROW_ON_ERROR));
 			/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
 			return $payload->exp;
@@ -222,7 +222,7 @@ class Client extends OpenIDConnectClient {
 			throw new OpenIDConnectClientException('Token (as per introspection) is inactive');
 		}
 		$clientId = $config['client-id'] ?? $this->getClientID();
-		$this->verifyAudience($introData, $this->getExpectedAudiences($config, $clientId), $config, $clientId);
+		$this->verifyAudience($introData, $this->getExpectedAudiences($config, $clientId), isset($config['audience']), $clientId);
 		return $introData->exp;
 	}
 
@@ -253,9 +253,7 @@ class Client extends OpenIDConnectClient {
 		// Anything that is not a usable audience string is a misconfiguration and
 		// must not silently widen the check - an empty string in particular would
 		// otherwise match a token carrying an empty "aud".
-		$expected = \array_values(\array_filter($configured, static function ($audience) {
-			return \is_string($audience) && $audience !== '';
-		}));
+		$expected = $this->usableAudienceStrings($configured);
 		// An empty result rejects every token, so say why: otherwise the only
 		// symptom of a JSON number, a bool or an empty list here is a site-wide
 		// auth outage whose log line reads like an attack rather than a typo.
@@ -270,7 +268,9 @@ class Client extends OpenIDConnectClient {
 				$expected === []
 					? 'No usable "audience" in the openid-connect config, only non-empty strings are accepted, so every access token will be rejected: %s'
 					: 'Ignoring unusable "audience" values in the openid-connect config, only non-empty strings are accepted: %s',
-				\json_encode($config['audience'])
+				// unescaped for the same reason as the audience mismatch below: the
+				// admin has to recognise their own value in it
+				\json_encode($config['audience'], JSON_UNESCAPED_SLASHES)
 			));
 		}
 		return $expected;
@@ -285,23 +285,37 @@ class Client extends OpenIDConnectClient {
 	 * The "aud" claim may be a single string or an array of strings per
 	 * RFC 7519 and RFC 7662.
 	 *
-	 * Without a configured "audience" a claim naming us as the client the token
-	 * was issued to is accepted instead - see tokenNamesThisClient(). Both
+	 * Unless the audience is authoritative, a claim naming us as the client the
+	 * token was issued to is accepted instead - see tokenNamesThisClient(). Both
 	 * branches follow that same rule: strictness is what "audience" buys.
 	 *
 	 * @param object $payload the decoded access token payload or the
 	 *                        introspection response
 	 * @param string[] $expectedAudiences as returned by getExpectedAudiences()
-	 * @param array|null $config the openid-connect config
+	 * @param bool $audienceIsAuthoritative whether "audience" is configured, in
+	 *                                      which case only "aud" is consulted
 	 * @param string|null $clientId the configured relying party client-id
 	 * @throws OpenIDConnectClientException if the audience does not match
 	 */
 	private function verifyAudience(
 		object $payload,
 		array $expectedAudiences,
-		?array $config,
+		bool $audienceIsAuthoritative,
 		?string $clientId
 	): void {
+		// Before anything else, and whatever the configuration says: a token that
+		// declares itself not to be an access token cannot authenticate as one.
+		// Checking it after the audience comparison would leave exactly the shapes
+		// that matter unguarded - a refresh token carrying the expected audience
+		// would be accepted by the comparison and never reach this point.
+		$marker = $this->nonAccessTokenMarker($payload);
+		if ($marker !== null) {
+			$this->logger->error(\sprintf(
+				'Token declares itself not to be an access token (%s) and cannot be used to authenticate one',
+				$marker
+			));
+			throw new OpenIDConnectClientException('Token is not an access token');
+		}
 		$audience = $payload->aud ?? null;
 		$audiences = \is_array($audience) ? $audience : [$audience];
 		foreach ($expectedAudiences as $expected) {
@@ -311,7 +325,7 @@ class Client extends OpenIDConnectClient {
 				return;
 			}
 		}
-		if (!isset($config['audience'])) {
+		if (!$audienceIsAuthoritative) {
 			$claim = $this->tokenNamesThisClient($payload, $clientId);
 			if ($claim !== null) {
 				// Only worth a word when the token carries an audience the admin
@@ -319,7 +333,7 @@ class Client extends OpenIDConnectClient {
 				// client, or an introspection response omitting it, both
 				// legitimate - there is nothing to configure, so advising it would
 				// be noise on every request.
-				if ($this->usableAudiences($audiences) !== []) {
+				if ($this->usableAudienceStrings($audiences) !== []) {
 					$this->reportAudienceFallbackOnce($claim, $audience);
 				}
 				return;
@@ -348,10 +362,16 @@ class Client extends OpenIDConnectClient {
 	 * send is the client: "azp" per OpenID Connect Core 1.0 §2, "appid" on Entra
 	 * ID v1.0 and AD FS, "client_id" per RFC 7662 §2.2.
 	 *
-	 * Accepting that keeps the finding this check was added for: a token minted
-	 * for a *different* client of the same issuer still fails (OC10-115, OC10-147).
-	 * What it does not cover is a token this client obtained for a different
-	 * *resource* and had replayed here (RFC 8707, RFC 8693) - configuring
+	 * Accepting that keeps the finding this check was added for: the attacker's own
+	 * client cannot mint a token that gets through here, because the claim names
+	 * their client, not ours (OC10-115, OC10-147). Note the narrower scope of that
+	 * statement - it is about *this* path. A token whose "aud" names us is still
+	 * accepted by the audience comparison above no matter which client requested
+	 * it, which is the resource-server model working as intended and unchanged from
+	 * before this fallback existed.
+	 *
+	 * What the fallback does not cover is a token this client obtained for a
+	 * different *resource* and had replayed here (RFC 8707, RFC 8693) - configuring
 	 * "audience" is what closes that, which is why it turns this fallback off.
 	 *
 	 * @param object $payload the decoded access token payload or the
@@ -374,17 +394,53 @@ class Client extends OpenIDConnectClient {
 	}
 
 	/**
-	 * The entries of an "aud" claim that could be configured as an expected
-	 * audience, i.e. the non-empty strings - the same filter getExpectedAudiences()
-	 * applies to the config side, so the two agree on what "usable" means.
+	 * The values usable as an audience, i.e. the non-empty strings. Applied to
+	 * both sides of the comparison - the configured `audience` and the token's
+	 * "aud" - so that the two cannot drift apart on what "usable" means.
 	 *
-	 * @param array $audiences the token's "aud", normalised to a list
+	 * @param array $audiences
 	 * @return string[]
 	 */
-	private function usableAudiences(array $audiences): array {
+	private function usableAudienceStrings(array $audiences): array {
 		return \array_values(\array_filter($audiences, static function ($audience) {
 			return \is_string($audience) && $audience !== '';
 		}));
+	}
+
+	/**
+	 * The claim by which the token states that it is a refresh token rather than an
+	 * access token, formatted for a log line - null when it makes no such claim.
+	 *
+	 * Keycloak marks its refresh and offline tokens with "typ" ("Refresh",
+	 * "Offline"; an access token carries "Bearer"), AWS Cognito uses "token_use".
+	 * A token that says this of itself has no business authenticating anything,
+	 * whatever its audience is: a refresh token lives far longer than an access
+	 * token and is stored rather than passed around, so accepting one as a bearer
+	 * credential turns every place it rests into a login. Consulted before the
+	 * audience comparison and regardless of configuration, precisely because a
+	 * provider whose refresh tokens carry the expected audience would otherwise
+	 * have them accepted by that comparison.
+	 *
+	 * Keycloak's own refresh tokens do not reach this code - they are HS512 signed
+	 * with a key that is not in the published JWKS, so verifyJWTsignature() throws
+	 * first (verified against 26.0). That is a property of one provider's defaults,
+	 * not a guarantee, which is why the check does not rely on it.
+	 *
+	 * ID tokens are deliberately not covered; see the README.
+	 *
+	 * @param object $payload
+	 * @return string|null
+	 */
+	private function nonAccessTokenMarker(object $payload): ?string {
+		foreach (['typ', 'token_use'] as $claim) {
+			$value = $payload->$claim ?? null;
+			if (\is_string($value)
+				&& \in_array(\strtolower($value), ['refresh', 'refresh_token', 'offline'], true)
+			) {
+				return \sprintf('"%s" is "%s"', $claim, $value);
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -403,7 +459,9 @@ class Client extends OpenIDConnectClient {
 		$this->audienceFallbackReported = true;
 		$this->logger->warning(\sprintf(
 			'Access token "aud" does not name this relying party, accepted because "%s" matches the configured client-id. '
-			. 'Set the openid-connect "audience" config key to what the provider sends in "aud" to have it enforced: %s',
+			. 'To have the audience enforced, set the openid-connect "audience" config key to what the provider sends '
+			. 'in "aud" - but only if that value is one only ownCloud can be issued a token for, since a shared or '
+			. 'tenant-wide resource identifier would accept tokens issued to other clients of the same provider: %s',
 			$claim,
 			// unescaped: this value is meant to be copied into the config verbatim
 			\json_encode($audience, JSON_UNESCAPED_SLASHES)

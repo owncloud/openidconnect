@@ -43,7 +43,16 @@ server* (RFC 9068 §3), so plenty of providers never put the client-id there:
 Keycloak sends no `aud` at all unless an audience mapper is configured, Entra ID
 v1.0 tokens send the App ID URI, AD FS sends
 `microsoft:identityserver:<identifier>`. Accepting the client claim keeps those
-working while still rejecting a token minted for a *different* client.
+working, and an attacker cannot forge their way through it: the claim sits inside a
+token the provider signed, and it names the client that asked for it.
+
+Regardless of audience, a token that declares itself *not* to be an access token is
+refused - `typ` of `Refresh` or `Offline` (Keycloak), `token_use` of `refresh` (AWS
+Cognito) - because a refresh token is long-lived and kept at rest, and must not
+double as a bearer credential. ID tokens are **not** covered by that rule: an ID
+token's `aud` is the `client-id` by definition, so one presented as a bearer token
+is accepted. If your clients can obtain ID tokens, treat them as credentials
+accordingly.
 
 For anything stronger, declare what your provider actually puts in `aud` with the
 optional `audience` key - which then becomes the only thing accepted:
@@ -68,12 +77,18 @@ the standard resource-server model and the only thing that can work when the
 client-id never appears in `aud`. So pick a value that only ownCloud's relying
 party can be issued for, and do not reuse it across clients.
 
-Leaving it unset is safe for the case it was added for - a token minted for another
-client never passes - but it cannot distinguish resources. If your IdP issues
-tokens to ownCloud's client for several resources (RFC 8707 resource indicators),
-set `audience`. Keycloak's stock client is the one shape where there is nothing to
-set: with no `aud` claim at all, no value can match, so either add a Keycloak
-audience mapper for the client-id or rely on `azp`.
+Leaving it unset covers the case the check was added for - a token an attacker
+obtained for their own client, addressed at their own client, does not pass - but it
+cannot distinguish *resources*: a token this client obtained for another resource is
+accepted, and so is one another client was issued *for our resource*, since `aud`
+naming us is enough (as it was before this key existed, and as the resource-server
+model intends). Note that another client of the same IdP can often get our identifier
+into `aud` deliberately - an audience mapper on their own client, or an RFC 8707
+`resource` parameter - so if your IdP hands out tokens for several resources, or lets
+other clients request yours, set `audience`.
+Keycloak's stock client is the one shape where there is nothing to set: with no `aud`
+claim at all, no value can match, so either add a Keycloak audience mapper for the
+client-id or rely on `azp`.
 
 Two further notes:
 
