@@ -53,6 +53,13 @@ class Client extends OpenIDConnectClient {
 	 * @var bool
 	 */
 	private $unusableAudienceReported = false;
+	/**
+	 * Same reasoning as $unusableAudienceReported: the compatibility acceptance is
+	 * reported once per request, not once per verification.
+	 *
+	 * @var bool
+	 */
+	private $audienceFallbackReported = false;
 
 	/**
 	 * Client constructor.
@@ -176,17 +183,8 @@ class Client extends OpenIDConnectClient {
 				$this->logger->error('Token cannot be verified: ' . $token);
 				throw new OpenIDConnectClientException('Token cannot be verified.');
 			}
-			// Deliberately NOT symmetrical with the introspection branch below.
-			// That one may fall back to RFC 7662 "client_id" because RFC 7662
-			// makes "aud" optional; RFC 9068 §2.2 makes "aud" REQUIRED in a JWT
-			// access token, so there is no conformant provider that needs the
-			// fallback here. It would also cost us: every claim in this branch
-			// arrives inside the caller's own request rather than from an
-			// authenticated back-channel call, and honouring "client_id" would
-			// accept a token this client legitimately obtained for a *different*
-			// resource (RFC 8707, RFC 8693) and had replayed at ownCloud. See #373.
 			$clientId = $config['client-id'] ?? $this->getClientID();
-			$this->verifyAudience($payload, $this->getExpectedAudiences($config, $clientId));
+			$this->verifyAudience($payload, $this->getExpectedAudiences($config, $clientId), $config, $clientId);
 			$this->logger->debug('Access token payload: ' . \json_encode($payload, JSON_THROW_ON_ERROR));
 			/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
 			return $payload->exp;
@@ -223,25 +221,8 @@ class Client extends OpenIDConnectClient {
 			$this->logger->error('Token (as per introspection) is inactive: ' . \json_encode($introData, JSON_THROW_ON_ERROR));
 			throw new OpenIDConnectClientException('Token (as per introspection) is inactive');
 		}
-		// RFC 7662 §2.2 defines "client_id" as the client the token was issued
-		// to, which is exactly what has to match this relying party. Unlike
-		// RFC 7519, RFC 7662 makes "aud" optional and providers commonly use it
-		// to name the resource server rather than the client, so the audience
-		// claim is only the fallback. Still fail closed: if neither claim
-		// names us - or no client-id is configured - verifyAudience() throws.
-		//
-		// Unless "audience" is configured. Then the admin has told us what "aud"
-		// holds, so it is no longer unreliable and becomes authoritative: taking
-		// the "client_id" shortcut here would accept a token this client
-		// obtained for a *different* resource, which is the same replay the JWT
-		// branch above refuses to allow.
 		$clientId = $config['client-id'] ?? $this->getClientID();
-		if (isset($config['audience'])
-			|| $clientId === null
-			|| ($introData->client_id ?? null) !== $clientId
-		) {
-			$this->verifyAudience($introData, $this->getExpectedAudiences($config, $clientId));
-		}
+		$this->verifyAudience($introData, $this->getExpectedAudiences($config, $clientId), $config, $clientId);
 		return $introData->exp;
 	}
 
@@ -304,12 +285,23 @@ class Client extends OpenIDConnectClient {
 	 * The "aud" claim may be a single string or an array of strings per
 	 * RFC 7519 and RFC 7662.
 	 *
+	 * Without a configured "audience" a claim naming us as the client the token
+	 * was issued to is accepted instead - see tokenNamesThisClient(). Both
+	 * branches follow that same rule: strictness is what "audience" buys.
+	 *
 	 * @param object $payload the decoded access token payload or the
 	 *                        introspection response
 	 * @param string[] $expectedAudiences as returned by getExpectedAudiences()
+	 * @param array|null $config the openid-connect config
+	 * @param string|null $clientId the configured relying party client-id
 	 * @throws OpenIDConnectClientException if the audience does not match
 	 */
-	private function verifyAudience(object $payload, array $expectedAudiences): void {
+	private function verifyAudience(
+		object $payload,
+		array $expectedAudiences,
+		?array $config,
+		?string $clientId
+	): void {
 		$audience = $payload->aud ?? null;
 		$audiences = \is_array($audience) ? $audience : [$audience];
 		foreach ($expectedAudiences as $expected) {
@@ -319,12 +311,103 @@ class Client extends OpenIDConnectClient {
 				return;
 			}
 		}
+		if (!isset($config['audience'])) {
+			$claim = $this->tokenNamesThisClient($payload, $clientId);
+			if ($claim !== null) {
+				// Only worth a word when the token carries an audience the admin
+				// could actually declare. With no usable "aud" - Keycloak's stock
+				// client, or an introspection response omitting it, both
+				// legitimate - there is nothing to configure, so advising it would
+				// be noise on every request.
+				if ($this->usableAudiences($audiences) !== []) {
+					$this->reportAudienceFallbackOnce($claim, $audience);
+				}
+				return;
+			}
+		}
+		// slashes unescaped: these values get copied into the config, and
+		// "api:\/\/owncloud" is not what the provider sent.
 		$this->logger->error(\sprintf(
 			'Token audience does not match the expected audience: token "aud" is %s, expected one of %s',
-			\json_encode($audience),
-			\json_encode($expectedAudiences)
+			\json_encode($audience, JSON_UNESCAPED_SLASHES),
+			\json_encode($expectedAudiences, JSON_UNESCAPED_SLASHES)
 		));
 		throw new OpenIDConnectClientException('Token audience does not match the expected audience');
+	}
+
+	/**
+	 * Whether a claim names this relying party as the client the token was issued
+	 * to, and which one did.
+	 *
+	 * This is the compatibility half of the audience check. An access token's
+	 * "aud" belongs to the resource server (RFC 9068 §3), so a provider that
+	 * addresses the resource never sends our client-id there, and requiring it
+	 * unconditionally locks those deployments out: Keycloak sends no "aud" at all
+	 * (observed against 26.0), Entra ID v1.0 tokens send the App ID URI, AD FS
+	 * sends "microsoft:identityserver:<identifier>" (#373). What all of them do
+	 * send is the client: "azp" per OpenID Connect Core 1.0 §2, "appid" on Entra
+	 * ID v1.0 and AD FS, "client_id" per RFC 7662 §2.2.
+	 *
+	 * Accepting that keeps the finding this check was added for: a token minted
+	 * for a *different* client of the same issuer still fails (OC10-115, OC10-147).
+	 * What it does not cover is a token this client obtained for a different
+	 * *resource* and had replayed here (RFC 8707, RFC 8693) - configuring
+	 * "audience" is what closes that, which is why it turns this fallback off.
+	 *
+	 * @param object $payload the decoded access token payload or the
+	 *                        introspection response
+	 * @param string|null $clientId the configured relying party client-id
+	 * @return string|null the claim that named us, null if none did
+	 */
+	private function tokenNamesThisClient(object $payload, ?string $clientId): ?string {
+		if ($clientId === null || $clientId === '') {
+			return null;
+		}
+		foreach (['azp', 'appid', 'client_id'] as $claim) {
+			// strict: a numeric client-id must not match a numeric claim of a
+			// different type, the same trap the audience comparison avoids.
+			if (($payload->$claim ?? null) === $clientId) {
+				return $claim;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * The entries of an "aud" claim that could be configured as an expected
+	 * audience, i.e. the non-empty strings - the same filter getExpectedAudiences()
+	 * applies to the config side, so the two agree on what "usable" means.
+	 *
+	 * @param array $audiences the token's "aud", normalised to a list
+	 * @return string[]
+	 */
+	private function usableAudiences(array $audiences): array {
+		return \array_values(\array_filter($audiences, static function ($audience) {
+			return \is_string($audience) && $audience !== '';
+		}));
+	}
+
+	/**
+	 * Reports that a token was accepted on a client-naming claim rather than on
+	 * its audience, and how to make the check strict. Once per instance, for the
+	 * same reason getExpectedAudiences() reports its complaint once: the Client is
+	 * a per-request singleton whose verification runs more than once per request.
+	 *
+	 * @param string $claim the claim that named us
+	 * @param mixed $audience the token's "aud" claim, for the admin to copy from
+	 */
+	private function reportAudienceFallbackOnce(string $claim, $audience): void {
+		if ($this->audienceFallbackReported) {
+			return;
+		}
+		$this->audienceFallbackReported = true;
+		$this->logger->warning(\sprintf(
+			'Access token "aud" does not name this relying party, accepted because "%s" matches the configured client-id. '
+			. 'Set the openid-connect "audience" config key to what the provider sends in "aud" to have it enforced: %s',
+			$claim,
+			// unescaped: this value is meant to be copied into the config verbatim
+			\json_encode($audience, JSON_UNESCAPED_SLASHES)
+		));
 	}
 
 	public function introspectToken($token, $token_type_hint = '', $clientId = null, $clientSecret = null) {

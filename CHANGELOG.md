@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 ## [Unreleased] - XXXX-XX-XX
 
 ### Fixed
+- [#374](https://github.com/owncloud/openidconnect/pull/374) - fix: accept an access token that names this client in azp, appid or client_id
 - [#374](https://github.com/owncloud/openidconnect/pull/374) - fix: let the expected access token audience be configured
 - [#365](https://github.com/owncloud/openidconnect/pull/365) - fix: verify token audience for introspected opaque tokens
 

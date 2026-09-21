@@ -34,12 +34,19 @@ occ config:app:set openidconnect openid-connect \
 
 #### Access token audience
 
-An access token is accepted only if it names this relying party. By default that
-means its `aud` claim carries the configured `client-id`, which is what most
-providers send - or, for an opaque token, that introspection reports a
-`client_id` of ours, since RFC 7662 leaves `aud` optional. Providers that address
-the *resource server* instead - AD FS is the common case - send neither, and need
-the optional `audience` key to declare what they actually put in `aud`:
+An access token is accepted only if it names this relying party. Out of the box
+that means either its `aud` claim carries the configured `client-id`, or a claim
+naming the client the token was issued to does: `azp` (OpenID Connect Core 1.0
+§2), `appid` (Entra ID v1.0 tokens and AD FS) or `client_id` (RFC 7662). The
+second half matters because an access token's `aud` belongs to the *resource
+server* (RFC 9068 §3), so plenty of providers never put the client-id there:
+Keycloak sends no `aud` at all unless an audience mapper is configured, Entra ID
+v1.0 tokens send the App ID URI, AD FS sends
+`microsoft:identityserver:<identifier>`. Accepting the client claim keeps those
+working while still rejecting a token minted for a *different* client.
+
+For anything stronger, declare what your provider actually puts in `aud` with the
+optional `audience` key - which then becomes the only thing accepted:
 
 ```json
 {"provider-url":"https://adfs.example.com/adfs","client-id":"your-client-id","client-secret":"your-secret","audience":"microsoft:identityserver:your-client-id"}
@@ -53,13 +60,20 @@ trust): AD FS prefixes it with `microsoft:identityserver:` unless it is already 
 URL, in which case it is sent verbatim. The value must match exactly, including
 case.
 
-Setting it makes `aud` authoritative, which cuts both ways. A token issued to
-this client for some *other* resource is now rejected, because the introspection
-`client_id` shortcut above no longer applies. But a token issued to a *different*
-client of the same IdP is accepted if its `aud` names us - which is the standard
-resource-server model, and the only thing that can work when the client-id never
-appears in `aud`. So pick a value that only ownCloud's relying party can be issued
-for, and do not reuse it across clients.
+Setting it makes `aud` authoritative, which cuts both ways. A token issued to this
+client for some *other* resource is now rejected, because the client-naming claims
+above are no longer consulted - that is the reason to set it. But a token issued to
+a *different* client of the same IdP is accepted if its `aud` names us, which is
+the standard resource-server model and the only thing that can work when the
+client-id never appears in `aud`. So pick a value that only ownCloud's relying
+party can be issued for, and do not reuse it across clients.
+
+Leaving it unset is safe for the case it was added for - a token minted for another
+client never passes - but it cannot distinguish resources. If your IdP issues
+tokens to ownCloud's client for several resources (RFC 8707 resource indicators),
+set `audience`. Keycloak's stock client is the one shape where there is nothing to
+set: with no `aud` claim at all, no value can match, so either add a Keycloak
+audience mapper for the client-id or rely on `azp`.
 
 Two further notes:
 

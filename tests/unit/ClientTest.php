@@ -720,27 +720,27 @@ class ClientTest extends TestCase {
 	}
 
 	/**
-	 * The JWT branch is deliberately NOT symmetrical with the introspection
-	 * branch: it must never accept a token on the strength of its "client_id"
-	 * claim. RFC 9068 §2.2 makes "aud" REQUIRED in a JWT access token, so no
-	 * conformant provider needs that fallback, and honouring it would accept a
-	 * token this client legitimately obtained for a different resource
-	 * (RFC 8707, RFC 8693) and had replayed here. Pins the decision on #373 so a
-	 * later "make the branches symmetrical" refactor cannot quietly undo it.
+	 * Configuring "audience" is what makes the audience authoritative, and then a
+	 * claim naming us as the client the token was issued to must not override it:
+	 * the token would be one this client legitimately obtained for a *different*
+	 * resource (RFC 8707, RFC 8693) and had replayed here. Pins the strict half of
+	 * the rule introduced for #373 so a later refactor cannot quietly widen it.
 	 *
 	 * @throws JsonException
 	 * @throws OpenIDConnectClientException
 	 */
-	public function testVerifyTokenJwtIgnoresClientIdClaim(): void {
+	public function testVerifyTokenJwtIgnoresClientIdClaimWhenAudienceConfigured(): void {
 		$this->client = $this->buildClientForJwt([
 			'provider-url' => 'https://example.net',
 			'client-id' => 'owncloud-client',
 			'client-secret' => 'secret',
+			// the admin has declared what "aud" holds ...
+			'audience' => 'resource-a',
 		], [
 			'exp' => \time() + 3600,
-			// names us as the client the token was issued to ...
+			// ... so naming us as the client the token was issued to ...
 			'client_id' => 'owncloud-client',
-			// ... but the token is addressed at somebody else
+			// ... does not rescue a token addressed at somebody else
 			'aud' => 'attacker-app',
 		]);
 
@@ -748,6 +748,384 @@ class ClientTest extends TestCase {
 		$this->expectExceptionMessage('Token audience does not match the expected audience');
 
 		$this->client->verifyToken('some-token');
+	}
+
+	/**
+	 * @return array<string, array{string}>
+	 */
+	public function providesClientNamingClaims(): array {
+		return [
+			// OpenID Connect Core 1.0 §2; what Keycloak and Entra ID v2.0 send
+			'azp' => ['azp'],
+			// Entra ID v1.0 tokens and AD FS have no "azp", they send "appid"
+			'appid' => ['appid'],
+			// RFC 7662 §2.2 names it "client_id"; also seen in JWT access tokens
+			'client_id' => ['client_id'],
+		];
+	}
+
+	/**
+	 * Without a configured "audience" the check has to stay as permissive as it
+	 * was before the audience check existed, or a patch-level app update locks
+	 * out every provider that does not put the client-id in "aud" - which
+	 * includes Keycloak, whose access token carries no "aud" at all (observed),
+	 * and Entra ID v1.0 tokens, whose "aud" is the App ID URI. A claim naming us
+	 * as the client the token was issued to is accepted instead, which still
+	 * rejects a token minted for a *different* client (OC10-115).
+	 *
+	 * @dataProvider providesClientNamingClaims
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtAcceptsClientNamingClaimWithoutConfiguredAudience(
+		string $claim
+	): void {
+		$payload = [
+			'exp' => \time() + 3600,
+			// no "aud" at all - Keycloak's shape
+			$claim => 'owncloud-client',
+		];
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], $payload);
+
+		self::assertEquals($payload['exp'], $this->client->verifyToken('some-token'));
+	}
+
+	/**
+	 * The compatibility fallback must not become a hole: a token issued to a
+	 * different client of the same issuer is what OC10-115 was about, and it stays
+	 * rejected whether or not "audience" is configured.
+	 *
+	 * @dataProvider providesClientNamingClaims
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtRejectsClientNamingClaimOfAnotherClient(
+		string $claim
+	): void {
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], [
+			'exp' => \time() + 3600,
+			$claim => 'attacker-app',
+		]);
+
+		$this->expectException(OpenIDConnectClientException::class);
+		$this->expectExceptionMessage('Token audience does not match the expected audience');
+
+		$this->client->verifyToken('some-token');
+	}
+
+	/**
+	 * A claim value that is not a string can never name this client, and must not
+	 * match through a loose comparison either - "0" == 0 is the classic way a
+	 * numeric client-id would turn the fallback into an accept-anything.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtRejectsNonStringClientNamingClaim(): void {
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => '0',
+			'client-secret' => 'secret',
+		], ['exp' => \time() + 3600, 'azp' => 0]);
+
+		$this->expectException(OpenIDConnectClientException::class);
+		$this->expectExceptionMessage('Token audience does not match the expected audience');
+
+		$this->client->verifyToken('some-token');
+	}
+
+	/**
+	 * An empty configured client-id names nobody, so a token whose client claim is
+	 * also empty must not pass on an ''==='' comparison. getExpectedAudiences()
+	 * already drops the empty string for the same reason; the fallback has to
+	 * agree, or a blank "client-id" in the config would accept such a token.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtRejectsEmptyClientIdMatchingEmptyClaim(): void {
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => '',
+			'client-secret' => 'secret',
+		], ['exp' => \time() + 3600, 'azp' => '']);
+
+		$this->expectException(OpenIDConnectClientException::class);
+		$this->expectExceptionMessage('Token audience does not match the expected audience');
+
+		$this->client->verifyToken('some-token');
+	}
+
+	/**
+	 * Taking the fallback is worth one log line: it is the difference between
+	 * "your provider does not address us in aud" and "your configuration is
+	 * complete", and it tells the admin how to make the check strict. Once per
+	 * instance, for the same reason the unusable-audience complaint is.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtClientNamingClaimAcceptanceIsReportedOnce(): void {
+		$this->logger->expects(self::once())
+			->method('warning')
+			->with(self::logicalAnd(
+				self::stringContains('appid'),
+				self::stringContains('audience'),
+				// the value the admin would copy into the config
+				self::stringContains('api://owncloud-client')
+			));
+
+		$payload = [
+			'exp' => \time() + 3600,
+			'aud' => 'api://owncloud-client',
+			'appid' => 'owncloud-client',
+		];
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], $payload);
+
+		self::assertEquals($payload['exp'], $this->client->verifyToken('some-token'));
+		self::assertEquals($payload['exp'], $this->client->verifyToken('some-token'));
+	}
+
+	/**
+	 * @return array<string, array{mixed}>
+	 */
+	public function providesUnconfigurableAudiences(): array {
+		return [
+			// Keycloak's stock client; RFC 7662 leaves "aud" optional too
+			'no aud claim' => [null],
+			// Ory Hydra addresses a token at nobody like this
+			'empty aud list' => [[]],
+			'empty aud string' => [''],
+		];
+	}
+
+	/**
+	 * When the token carries no usable audience there is nothing an admin could put
+	 * in "audience" to make the check strict, so saying so on every request is
+	 * noise rather than advice. Accept on the client claim and stay quiet -
+	 * Keycloak's stock client and any introspection response without "aud" land
+	 * here, and both are legitimate configurations.
+	 *
+	 * @dataProvider providesUnconfigurableAudiences
+	 * @param mixed $aud
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtUnconfigurableAudienceIsNotReported($aud): void {
+		$this->logger->expects(self::never())->method('warning');
+
+		$payload = ['exp' => \time() + 3600, 'azp' => 'owncloud-client'];
+		if ($aud !== null) {
+			$payload['aud'] = $aud;
+		}
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], $payload);
+
+		self::assertEquals($payload['exp'], $this->client->verifyToken('some-token'));
+	}
+
+	/**
+	 * The access token shape of every identity provider ownCloud documents, so a
+	 * later tightening of the audience check cannot lock one of them out unnoticed.
+	 * "client-id" is 'owncloud-client' throughout, except where a provider only
+	 * issues GUIDs.
+	 *
+	 * Each case records where its shape comes from and whether it was *observed*
+	 * or taken from vendor documentation - they are not equally strong evidence.
+	 *
+	 * @return array<string, array{array<string, mixed>, bool, string|null}>
+	 */
+	public function providesIdpAccessTokenShapes(): array {
+		return [
+			// OBSERVED: Keycloak 26.0, confidential client, scope=openid, no
+			// audience mapper. There is no "aud" claim at all, so no configured
+			// "audience" can rescue it either - only "azp" names us.
+			'Keycloak, stock client (observed)' => [
+				['azp' => 'owncloud-client'],
+				true,
+				null,
+			],
+			// OBSERVED: the same realm with an oidc-audience-mapper added, which is
+			// the Keycloak-side way to get the client-id into "aud".
+			'Keycloak with audience mapper (observed)' => [
+				['aud' => 'owncloud-client', 'azp' => 'owncloud-client'],
+				true,
+				'owncloud-client',
+			],
+			// Microsoft Entra ID v2.0 tokens (app manifest
+			// requestedAccessTokenVersion = 2): "aud" is the resource application's
+			// client-id, which is ownCloud's own client-id in the setup our docs
+			// describe, where ownCloud is both the client and the API.
+			// Claim names from Microsoft's own v2.0 example token.
+			'Entra ID v2.0 token (vendor doc)' => [
+				[
+					'aud' => 'owncloud-client',
+					'azp' => 'owncloud-client',
+					'azpacr' => '0',
+					'scp' => 'access_as_user',
+					'ver' => '2.0',
+				],
+				true,
+				'owncloud-client',
+			],
+			// Microsoft Entra ID v1.0 tokens - the default, since
+			// requestedAccessTokenVersion is null unless someone sets it. "aud" is
+			// the App ID URI, and there is no "azp"; the client is named by "appid".
+			'Entra ID v1.0 token (vendor doc)' => [
+				[
+					'aud' => 'api://owncloud-client',
+					'appid' => 'owncloud-client',
+					'appidacr' => '0',
+					'scp' => 'user_impersonation',
+					'ver' => '1.0',
+				],
+				true,
+				'api://owncloud-client',
+			],
+			// AD FS, as reported in #373: the relying party identifier rendered as
+			// "microsoft:identityserver:<identifier>", plus "appid" like Entra v1.0.
+			'AD FS token (#373)' => [
+				[
+					'aud' => 'microsoft:identityserver:owncloud-client',
+					'appid' => 'owncloud-client',
+					'apptype' => 'Confidential',
+					'scp' => 'email profile openid',
+					'ver' => '1.0',
+				],
+				true,
+				'microsoft:identityserver:owncloud-client',
+			],
+			// Kopano Konnect passes the client-id as the access token audience:
+			// oidc/provider/handlers.go calls makeAccessToken(ctx, ar.ClientID, ...).
+			'Kopano Konnect token (source)' => [
+				['aud' => 'owncloud-client'],
+				true,
+				'owncloud-client',
+			],
+			// OneLogin API authorization: "aud" is the list of configured API
+			// audience URIs, never the client-id, and "azp" carries the OIDC app id.
+			'OneLogin API authorization token (vendor doc)' => [
+				[
+					'aud' => ['https://example.com', 'https://example.com/contacts'],
+					'azp' => 'owncloud-client',
+					'scope' => 'openid profile',
+				],
+				true,
+				'https://example.com/contacts',
+			],
+			// A token from the same issuer for a different client stays rejected in
+			// both modes - the finding all of this exists for (OC10-115).
+			'another client of the same issuer' => [
+				['aud' => 'other-app', 'azp' => 'other-app'],
+				false,
+				null,
+			],
+		];
+	}
+
+	/**
+	 * With no "audience" configured - the state every existing install upgrades
+	 * into - each documented provider must still authenticate.
+	 *
+	 * @dataProvider providesIdpAccessTokenShapes
+	 * @param array<string, mixed> $claims
+	 * @param bool $expectAccepted
+	 * @param string|null $strictAudience
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testIdpAccessTokenShapeWithoutConfiguredAudience(
+		array $claims,
+		bool $expectAccepted,
+		?string $strictAudience
+	): void {
+		$payload = \array_merge(['exp' => \time() + 3600], $claims);
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], $payload);
+
+		if (!$expectAccepted) {
+			$this->expectException(OpenIDConnectClientException::class);
+			$this->expectExceptionMessage('Token audience does not match the expected audience');
+		}
+		self::assertEquals($payload['exp'], $this->client->verifyToken('some-token'));
+	}
+
+	/**
+	 * And with "audience" configured to what the provider sends, the check is
+	 * strict and still passes - except for Keycloak's stock client, which sends no
+	 * "aud" at all, so there is no value to configure. That asymmetry is the whole
+	 * reason the client-naming fallback exists rather than only the config key.
+	 *
+	 * @dataProvider providesIdpAccessTokenShapes
+	 * @param array<string, mixed> $claims
+	 * @param bool $expectAccepted
+	 * @param string|null $strictAudience
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testIdpAccessTokenShapeWithConfiguredAudience(
+		array $claims,
+		bool $expectAccepted,
+		?string $strictAudience
+	): void {
+		$payload = \array_merge(['exp' => \time() + 3600], $claims);
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+			// nothing usable to declare: configure the client-id, which is what an
+			// admin would try, and watch it fail closed
+			'audience' => $strictAudience ?? 'owncloud-client',
+		], $payload);
+
+		if ($strictAudience === null) {
+			$this->expectException(OpenIDConnectClientException::class);
+			$this->expectExceptionMessage('Token audience does not match the expected audience');
+		}
+		self::assertEquals($payload['exp'], $this->client->verifyToken('some-token'));
+	}
+
+	/**
+	 * A matching "aud" is the normal path and must not be reported as a
+	 * compatibility fallback, even when a client-naming claim is present too -
+	 * which is exactly what a spec-compliant provider sends.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtMatchingAudienceIsNotReportedAsFallback(): void {
+		$this->logger->expects(self::never())->method('warning');
+
+		$payload = [
+			'exp' => \time() + 3600,
+			'aud' => 'owncloud-client',
+			'azp' => 'owncloud-client',
+		];
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], $payload);
+
+		self::assertEquals($payload['exp'], $this->client->verifyToken('some-token'));
 	}
 
 	/**
