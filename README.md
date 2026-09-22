@@ -37,23 +37,33 @@ occ config:app:set openidconnect openid-connect \
 An access token is accepted only if it names this relying party. Out of the box
 that means either its `aud` claim carries the configured `client-id`, or a claim
 naming the client the token was issued to does: `azp` (OpenID Connect Core 1.0
-§2), `appid` (Entra ID v1.0 tokens and AD FS) or `client_id` (RFC 7662). The
-second half matters because an access token's `aud` belongs to the *resource
-server* (RFC 9068 §3), so plenty of providers never put the client-id there:
-Keycloak sends no `aud` at all unless an audience mapper is configured, Entra ID
-v1.0 tokens send the App ID URI, AD FS sends
-`microsoft:identityserver:<identifier>`. Accepting the client claim keeps those
-working, and an attacker cannot forge their way through it: the claim sits inside a
-token the provider signed, and it names the client that asked for it.
+§2), `appid` (Entra ID v1.0 tokens and AD FS) or `client_id` (RFC 7662) - whichever
+of those three the token carries *first*, in that order of precedence. The second
+half matters because an access token's `aud` belongs to the *resource server*
+(RFC 9068 §3), so plenty of providers never put the client-id there: Keycloak sends
+no `aud` at all unless an audience mapper is configured, Entra ID v1.0 tokens send
+the App ID URI, AD FS sends `microsoft:identityserver:<identifier>`. Accepting the
+client claim keeps those working.
 
-Regardless of audience, a token that declares itself *not* to be an access token is
-refused - `typ` of `Refresh` or `Offline` (Keycloak), `token_use` of `refresh` (AWS
-Cognito) - because a refresh token is long-lived and kept at rest, and must not
-double as a bearer credential. ID tokens carry no such marker, and an ID token's
-`aud` *is* the `client-id`, so one presented as a bearer token is accepted for as
-long as the `client-id` is an accepted audience; setting `audience` to anything else
-rejects them as a side effect. Where that is not an option, treat ID tokens as
-credentials.
+Precedence is what makes it safe: only the most authoritative claim present is
+consulted, so a token whose `azp` truthfully names another client is refused even if
+it also carries a `client_id` naming us - a shape a tenant can produce on a shared
+realm with a hardcoded-claim mapper, where every claim in the token is honest.
+
+Regardless of audience, a token that labels its own type has to label itself an
+access token: `typ` of `Bearer` (Keycloak) or `at+jwt` (RFC 9068 §2.1), `token_use`
+of `access` (AWS Cognito). Anything else is refused. That is an allowlist rather than
+a list of refresh markers on purpose - Keycloak's refresh, offline, back-channel
+logout, registration and ID tokens are all realm-signed and carry an `aud` equal to
+the `client-id`, so an enumeration would have to keep up with each of them, and a
+refresh token in particular is long-lived and kept at rest, so it must never double
+as a bearer credential.
+
+A provider that puts no type claim in the payload is unaffected, which includes Entra
+ID and AD FS. There, an ID token still satisfies the default expectation, because an
+ID token's `aud` *is* the `client-id` - so it is accepted for as long as the
+`client-id` is an accepted audience, and setting `audience` to anything else rejects
+it as a side effect. Where that is not an option, treat ID tokens as credentials.
 
 For anything stronger, declare what your provider actually puts in `aud` with the
 optional `audience` key - which then becomes the only thing accepted:
@@ -96,9 +106,11 @@ Two further notes:
 - Do **not** set `audience` if your token introspection response omits `aud`.
   RFC 7662 allows that, and since setting it makes `aud` authoritative, every
   opaque token would then be rejected.
-- With `exchange-token-mode-before-introspection`, the first entry is also what
-  the token exchange asks the IdP for, so list the resource ownCloud should be
-  given first.
+- With `exchange-token-mode-before-introspection`, the first entry that survives the
+  usable-string filter is also what the token exchange asks the IdP for - so an
+  unquoted number ahead of the real value is dropped and the resource behind it is
+  requested instead. List the resource ownCloud should be given first, and keep the
+  list free of values that cannot be an audience.
 
 See the
 [admin manual](https://doc.owncloud.com/server/latest/admin_manual/configuration/user/oidc/index.html)
