@@ -31,6 +31,7 @@ use OCA\OpenIdConnect\OpenIdConnectAuthModule;
 use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
 use OCP\Http\Client\IClientService;
+use OCP\ICache;
 use OCP\ICacheFactory;
 use OCP\IConfig;
 use OCP\ILogger;
@@ -165,6 +166,58 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 	/**
 	 * @throws LoginException
 	 */
+	/**
+	 * A cache entry short-circuits verification completely, so an entry for a token
+	 * whose expiry is unknown - which RFC 7662 §2.2 permits an introspection response
+	 * to be - must not be cached without a TTL. It would otherwise keep authenticating
+	 * that token after the provider revoked it, with nothing left to expire it: the
+	 * expiry check in authToken() needs an expiry to fire.
+	 *
+	 * @throws \JsonException
+	 */
+	public function testAnUnknownExpiryIsCachedWithATtl(): void {
+		$this->client->method('getOpenIdConfig')->willReturn(['client-id' => 'client-id']);
+		$this->client->method('introspectToken')->willReturn((object)['active' => true, 'aud' => 'client-id']);
+		$this->client->method('getUserInfo')->willReturn((object)['email' => 'foo@example.com']);
+		$cache = $this->createMock(ICache::class);
+		$cache->expects(self::once())
+			->method('set')
+			->with('1234567890', ['uid' => 'alice', 'exp' => null], self::greaterThan(0));
+		$this->cacheFactory->method('create')->willReturn($cache);
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('alice');
+		$this->lookupService->expects(self::once())->method('lookupUser')->willReturn($user);
+		$request = $this->createMock(IRequest::class);
+		$request->method('getHeader')->willReturn('Bearer 1234567890');
+
+		self::assertEquals($user, $this->authModule->auth($request));
+	}
+
+	/**
+	 * With a known expiry the entry may live indefinitely, because the expiry check
+	 * runs on every request and throws once the token is past it.
+	 *
+	 * @throws \JsonException
+	 */
+	public function testAKnownExpiryIsCachedWithoutATtl(): void {
+		$exp = \time() + 3600;
+		$this->client->method('getOpenIdConfig')->willReturn(['client-id' => 'client-id']);
+		$this->client->method('introspectToken')->willReturn((object)['active' => true, 'exp' => $exp, 'aud' => 'client-id']);
+		$this->client->method('getUserInfo')->willReturn((object)['email' => 'foo@example.com']);
+		$cache = $this->createMock(ICache::class);
+		$cache->expects(self::once())
+			->method('set')
+			->with('1234567890', ['uid' => 'alice', 'exp' => $exp], 0);
+		$this->cacheFactory->method('create')->willReturn($cache);
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('alice');
+		$this->lookupService->expects(self::once())->method('lookupUser')->willReturn($user);
+		$request = $this->createMock(IRequest::class);
+		$request->method('getHeader')->willReturn('Bearer 1234567890');
+
+		self::assertEquals($user, $this->authModule->auth($request));
+	}
+
 	public function testValidTokenWithIntrospection(): void {
 		$this->client->method('getOpenIdConfig')->willReturn(['client-id' => 'client-id']);
 		$this->client->method('introspectToken')->willReturn((object)['active' => true, 'exp' => \time() + 3600, 'aud' => 'client-id']);

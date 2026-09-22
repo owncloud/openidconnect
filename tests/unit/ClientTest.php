@@ -67,10 +67,17 @@ class ClientTest extends TestCase {
 	}
 
 	public function appConfigProvider(): \Generator {
-		yield 'invalid json' => ['from system config', '{[s', 'Loaded config from DB is not valid (malformed JSON); JSON Last Error: 4'];
-		yield 'empty app config' => ['from system config', ''];
+		yield 'invalid json' => [['from' => 'system config'], '{[s', 'Loaded config from DB is not valid (malformed JSON); JSON Last Error: 4'];
+		yield 'empty app config' => [['from' => 'system config'], ''];
 		yield 'empty array' => [[], '[]'];
 		yield 'json object' => [['foo' => 'bar'], '{"foo": "bar"}'];
+		// A scalar is valid JSON, so json_last_error() says nothing about it - but
+		// callers type-hint an array, and a TypeError escapes the
+		// OpenIDConnectClientException handler in the auth module as a 500 rather
+		// than a 401. All three are what a fat-fingered occ config:app:set produces.
+		yield 'scalar int' => [['from' => 'system config'], '123', 'Loaded config from DB is not valid (expected an object, got integer)'];
+		yield 'scalar bool' => [['from' => 'system config'], 'true', 'Loaded config from DB is not valid (expected an object, got boolean)'];
+		yield 'scalar string' => [['from' => 'system config'], '"provider-url"', 'Loaded config from DB is not valid (expected an object, got string)'];
 	}
 
 	protected function setUp(): void {
@@ -88,16 +95,44 @@ class ClientTest extends TestCase {
 	}
 
 	public function testGetConfig(): void {
-		$this->config->expects(self::once())->method('getSystemValue')->willReturn('foo');
+		$this->config->expects(self::once())->method('getSystemValue')->willReturn(['provider-url' => 'foo']);
 		$return = $this->client->getOpenIdConfig();
-		self::assertEquals('foo', $return);
+		self::assertEquals(['provider-url' => 'foo'], $return);
+	}
+
+	/**
+	 * config.php can hold a scalar just as the app config can, and every caller here
+	 * type-hints an array - so neither source may hand one out, or the TypeError
+	 * escapes the OpenIDConnectClientException handler in the auth module as a 500.
+	 *
+	 * @return array<string, array{mixed}>
+	 */
+	public function providesInvalidSystemConfigs(): array {
+		return [
+			'int' => [123],
+			'bool' => [true],
+			'string' => ['provider-url'],
+		];
+	}
+
+	/**
+	 * @dataProvider providesInvalidSystemConfigs
+	 * @param mixed $systemValue
+	 */
+	public function testGetConfigRejectsANonArraySystemValue($systemValue): void {
+		$this->config->method('getSystemValue')->willReturn($systemValue);
+		$this->logger->expects(self::once())
+			->method('error')
+			->with(self::stringContains('openid-connect system config is not valid'), self::anything());
+
+		self::assertNull($this->client->getOpenIdConfig());
 	}
 
 	/**
 	 * @dataProvider appConfigProvider
 	 */
 	public function testGetAppConfig($expectedData, $dataInConfig, $expectedErrorMessage = null): void {
-		$this->config->method('getSystemValue')->willReturn('from system config');
+		$this->config->method('getSystemValue')->willReturn(['from' => 'system config']);
 		$this->config->expects(self::once())->method('getAppValue')->willReturnCallback(function () use ($dataInConfig) {
 			return $dataInConfig;
 		});
@@ -819,6 +854,110 @@ class ClientTest extends TestCase {
 	}
 
 	/**
+	 * The same claims on the introspection branch, so that "both branches follow the
+	 * same rule" is pinned rather than asserted: a refactor narrowing the claim list
+	 * on the introspection path would otherwise leave the suite green while an
+	 * introspecting Keycloak or Entra ID v1.0 deployment stopped authenticating.
+	 *
+	 * @dataProvider providesClientNamingClaims
+	 * @param string $claim
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenIntrospectionAcceptsClientNamingClaimWithoutConfiguredAudience(
+		string $claim
+	): void {
+		$introspectionData = [
+			'active' => true,
+			'exp' => \time() + 3600,
+			$claim => 'owncloud-client',
+		];
+		$this->client = $this->buildClientForIntrospection([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], $introspectionData);
+
+		self::assertEquals($introspectionData['exp'], $this->client->verifyToken('some-opaque-token'));
+	}
+
+	/**
+	 * @dataProvider providesClientNamingClaims
+	 * @param string $claim
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenIntrospectionRejectsClientNamingClaimOfAnotherClient(
+		string $claim
+	): void {
+		$this->client = $this->buildClientForIntrospection([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], [
+			'active' => true,
+			'exp' => \time() + 3600,
+			$claim => 'attacker-app',
+		]);
+
+		$this->expectException(OpenIDConnectClientException::class);
+		$this->expectExceptionMessage('Token audience does not match the expected audience');
+
+		$this->client->verifyToken('some-opaque-token');
+	}
+
+	/**
+	 * @return array<string, array{array<string, mixed>}>
+	 */
+	public function providesConflictingClientNamingClaims(): array {
+		return [
+			// the shape a tenant can produce on a shared realm: a truthful "azp"
+			// naming their own client, plus a hardcoded-claim mapper emitting a
+			// "client_id" naming ours
+			'azp names another client, client_id names ours' => [[
+				'azp' => 'attacker-app',
+				'client_id' => 'owncloud-client',
+			]],
+			'azp names another client, appid names ours' => [[
+				'azp' => 'attacker-app',
+				'appid' => 'owncloud-client',
+			]],
+			// and the same one step down the precedence order
+			'appid names another client, client_id names ours' => [[
+				'appid' => 'attacker-app',
+				'client_id' => 'owncloud-client',
+			]],
+		];
+	}
+
+	/**
+	 * The most authoritative claim present decides. Falling through a
+	 * present-but-different claim to a lower-precedence one would accept a token
+	 * every claim of which is honest: "azp" names the client that asked for it, and
+	 * a hardcoded "client_id" names us. That is the property the fallback claims to
+	 * have, so it has to hold rather than nearly hold.
+	 *
+	 * @dataProvider providesConflictingClientNamingClaims
+	 * @param array<string, mixed> $claims
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtRejectsWhenTheAuthoritativeClaimNamesAnotherClient(
+		array $claims
+	): void {
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], \array_merge(['exp' => \time() + 3600], $claims));
+
+		$this->expectException(OpenIDConnectClientException::class);
+		$this->expectExceptionMessage('Token audience does not match the expected audience');
+
+		$this->client->verifyToken('some-token');
+	}
+
+	/**
 	 * The compatibility fallback must not become a hole: a token issued to a
 	 * different client of the same issuer is what OC10-115 was about, and it stays
 	 * rejected whether or not "audience" is configured.
@@ -898,8 +1037,12 @@ class ClientTest extends TestCase {
 	 * @throws OpenIDConnectClientException
 	 */
 	public function testVerifyTokenJwtClientNamingClaimAcceptanceIsReportedOnce(): void {
+		// info, not warning: this is the documented happy path for several providers
+		// and the flag only dedupes within a request, so a warning here would be
+		// emitted for every token acquisition of every user
+		$this->logger->expects(self::never())->method('warning');
 		$this->logger->expects(self::once())
-			->method('warning')
+			->method('info')
 			->with(self::logicalAnd(
 				self::stringContains('appid'),
 				self::stringContains('audience'),
@@ -926,6 +1069,136 @@ class ClientTest extends TestCase {
 	}
 
 	/**
+	 * A token that fails signature verification is still a live credential - a key
+	 * rotated out of the JWKS is the everyday cause - so the value must not reach a
+	 * log that log shippers and support bundles collect. What identifies it instead
+	 * is the header's "kid" and "alg" and the payload's "sub".
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtKeepsTheTokenOutOfTheLogOnSignatureFailure(): void {
+		// a real-shaped JWT: {"alg":"RS256","kid":"abc123"} . {"sub":"alice"} . sig
+		$token = 'eyJhbGciOiJSUzI1NiIsImtpZCI6ImFiYzEyMyJ9.eyJzdWIiOiJhbGljZSJ9.c2ln';
+		$this->config->method('getSystemValue')->willReturnCallback(
+			static function ($key) {
+				return $key === 'openid-connect' ? [
+					'provider-url' => 'https://example.net',
+					'client-id' => 'owncloud-client',
+					'client-secret' => 'secret',
+				] : null;
+			}
+		);
+		$this->client = $this->getMockBuilder(Client::class)
+			->setConstructorArgs([$this->config, $this->urlGenerator, $this->session, $this->logger, $this->clientService])
+			->onlyMethods(['getAccessTokenPayload', 'verifyJWTsignature', 'setAccessToken'])
+			->getMock();
+		$this->client->method('setAccessToken');
+		$this->client->method('getAccessTokenPayload')->willReturn((object)['sub' => 'alice']);
+		$this->client->method('verifyJWTsignature')->willReturn(false);
+
+		$this->logger->expects(self::once())
+			->method('error')
+			->with(self::logicalAnd(
+				self::logicalNot(self::stringContains($token)),
+				self::stringContains('kid="abc123"'),
+				self::stringContains('alg="RS256"'),
+				self::stringContains('sub="alice"')
+			));
+
+		$this->expectException(OpenIDConnectClientException::class);
+		$this->expectExceptionMessage('Token cannot be verified.');
+
+		$this->client->verifyToken($token);
+	}
+
+	/**
+	 * @return array<string, array{mixed}>
+	 */
+	public function providesUnusableExpiries(): array {
+		return [
+			'absent' => [null],
+			// a numeric string is not a JSON number, so not a NumericDate
+			'string' => ['1789990000'],
+			'bool' => [true],
+			// both of these pass "if ($expiry)" as false in the auth module, so they
+			// would skip the expiry check exactly like a missing claim
+			'zero' => [0],
+			'negative' => [-1],
+		];
+	}
+
+	/**
+	 * RFC 7519 §2 defines NumericDate as a JSON number, so a non-integral one is
+	 * legal and must be accepted rather than turned into an auth outage.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtAcceptsANonIntegralExpiry(): void {
+		$exp = \time() + 3600.75;
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], ['exp' => $exp, 'azp' => 'owncloud-client']);
+
+		self::assertSame((int)$exp, $this->client->verifyToken('some-token'));
+	}
+
+	/**
+	 * A JWT access token without a usable "exp" must not authenticate. RFC 9068 §2.2
+	 * makes it REQUIRED, and OpenIdConnectAuthModule::authToken() guards its expiry
+	 * check with "if ($expiry)" - so a null would not merely be tolerated, it would
+	 * skip expiry verification altogether and make the token good forever.
+	 *
+	 * @dataProvider providesUnusableExpiries
+	 * @param mixed $exp
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtRejectsAPayloadWithoutUsableExpiry($exp): void {
+		$payload = ['azp' => 'owncloud-client'];
+		if ($exp !== null) {
+			$payload['exp'] = $exp;
+		}
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], $payload);
+
+		$this->expectException(OpenIDConnectClientException::class);
+		$this->expectExceptionMessage('Access token has no expiry');
+
+		$this->client->verifyToken('some-token');
+	}
+
+	/**
+	 * The introspection branch is deliberately not held to that: RFC 7662 §2.2 makes
+	 * "exp" OPTIONAL there, and "active": true is the authoritative statement. It
+	 * must return null rather than raise, because the auth module's updateCache()
+	 * would otherwise be handed a value its signature rejects and the TypeError would
+	 * escape as a 500.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenIntrospectionToleratesNoExpiry(): void {
+		$this->client = $this->buildClientForIntrospection([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], ['active' => true, 'client_id' => 'owncloud-client']);
+
+		self::assertNull($this->client->verifyToken('some-opaque-token'));
+	}
+
+	/**
+	 * Everything a provider can label a token as that is not an access token. The
+	 * check is an allowlist, so this list does not have to be exhaustive for the
+	 * guard to hold - which is the point of inverting it.
+	 *
 	 * @return array<string, array{string, string}>
 	 */
 	public function providesNonAccessTokenMarkers(): array {
@@ -938,15 +1211,65 @@ class ClientTest extends TestCase {
 			'lowercase' => ['typ', 'refresh'],
 			// AWS Cognito marks the same thing with "token_use"
 			'token_use' => ['token_use', 'refresh'],
+			// the classes an enumeration of refresh markers missed: all of these are
+			// realm-signed and carry "aud" equal to the client-id, so the audience
+			// check alone waves them through
+			'keycloak back-channel logout token' => ['typ', 'Logout'],
+			'keycloak id token' => ['typ', 'ID'],
+			'cognito id token' => ['token_use', 'id'],
+			'keycloak registration token' => ['typ', 'RegistrationAccessToken'],
+			'keycloak initial access token' => ['typ', 'InitialAccessToken'],
 		];
 	}
 
 	/**
-	 * A token that says of itself that it is a refresh token must not authenticate,
-	 * however well its claims match. Keycloak signs
-	 * refresh tokens with an HMAC key that is not in the published JWKS, so
-	 * verifyJWTsignature() already rejects them there - but that is a property of
-	 * one provider's defaults, not something this code can rely on.
+	 * @return array<string, array{string, string}>
+	 */
+	public function providesAccessTokenMarkers(): array {
+		return [
+			// what Keycloak puts on the token this fallback exists for (observed)
+			'keycloak bearer' => ['typ', 'Bearer'],
+			// RFC 9068 §2.1 media type
+			'rfc 9068' => ['typ', 'at+jwt'],
+			// AWS Cognito
+			'cognito access' => ['token_use', 'access'],
+			'access_token' => ['token_use', 'access_token'],
+			'casing is not ours to depend on' => ['typ', 'BEARER'],
+		];
+	}
+
+	/**
+	 * The other side of the allowlist: a token that labels itself an access token
+	 * keeps working, whichever spelling the provider uses.
+	 *
+	 * @dataProvider providesAccessTokenMarkers
+	 * @param string $claim
+	 * @param string $value
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenJwtAcceptsAnAccessTokenMarker(string $claim, string $value): void {
+		$payload = [
+			'exp' => \time() + 3600,
+			'azp' => 'owncloud-client',
+			$claim => $value,
+		];
+		$this->client = $this->buildClientForJwt([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], $payload);
+
+		self::assertEquals($payload['exp'], $this->client->verifyToken('some-token'));
+	}
+
+	/**
+	 * A token that labels itself as anything other than an access token must not
+	 * authenticate, however well its other claims match. Keycloak's refresh tokens
+	 * happen not to reach this check - they are HS512 signed and the vendored library
+	 * verifies HS* against the client secret, which fails - but that is one
+	 * provider's defaults rather than something this code can rely on, and it says
+	 * nothing about its logout or registration tokens, which are RS256.
 	 *
 	 * @dataProvider providesNonAccessTokenMarkers
 	 * @param string $claim
@@ -1097,6 +1420,7 @@ class ClientTest extends TestCase {
 	 */
 	public function testVerifyTokenJwtUnconfigurableAudienceIsNotReported($aud): void {
 		$this->logger->expects(self::never())->method('warning');
+		$this->logger->expects(self::never())->method('info');
 
 		$payload = ['exp' => \time() + 3600, 'azp' => 'owncloud-client'];
 		if ($aud !== null) {
@@ -1201,11 +1525,14 @@ class ClientTest extends TestCase {
 				'https://example.com/contacts',
 			],
 			// A token from the same issuer for a different client stays rejected in
-			// both modes - the finding all of this exists for (OC10-115).
+			// both modes - the finding all of this exists for (OC10-115). Unlike the
+			// Keycloak row above there *is* an audience to declare here, so the strict
+			// mode test configures it and still expects a rejection: the token is
+			// refused for naming another client, not for want of a configurable value.
 			'another client of the same issuer' => [
 				['aud' => 'other-app', 'azp' => 'other-app'],
 				false,
-				null,
+				'owncloud-client',
 			],
 		];
 	}
@@ -1268,7 +1595,12 @@ class ClientTest extends TestCase {
 			'audience' => $strictAudience ?? 'owncloud-client',
 		], $payload);
 
-		if ($strictAudience === null) {
+		// two independent reasons to expect a rejection, and the test has to
+		// distinguish them: a row with nothing declarable fails closed even though its
+		// token is legitimate, while the cross-client row has to fail because the
+		// token is not ours. Driving both off $strictAudience alone would keep passing
+		// if cross-client rejection regressed.
+		if ($strictAudience === null || !$expectAccepted) {
 			$this->expectException(OpenIDConnectClientException::class);
 			$this->expectExceptionMessage('Token audience does not match the expected audience');
 		}
@@ -1285,6 +1617,7 @@ class ClientTest extends TestCase {
 	 */
 	public function testVerifyTokenJwtMatchingAudienceIsNotReportedAsFallback(): void {
 		$this->logger->expects(self::never())->method('warning');
+		$this->logger->expects(self::never())->method('info');
 
 		$payload = [
 			'exp' => \time() + 3600,

@@ -125,10 +125,40 @@ class Client extends OpenIDConnectClient {
 				);
 				return $this->config->getSystemValue('openid-connect', null);
 			}
+			// "123", "true" and bare strings are valid JSON, so json_last_error()
+			// says nothing about them - and a scalar here reaches callers that expect
+			// an array, where it is a TypeError rather than a configuration error.
+			// Fail the same way a malformed value does.
+			if (!\is_array($config)) {
+				$this->logger->error(
+					'Loaded config from DB is not valid (expected an object, got ' . \gettype($config) . ')',
+					['app' => Application::APPID]
+				);
+				return $this->systemConfigOrNull();
+			}
 			return $config;
 		}
 
-		return $this->config->getSystemValue('openid-connect', null);
+		return $this->systemConfigOrNull();
+	}
+
+	/**
+	 * The openid-connect system config, or null when it is not one. config.php can
+	 * hold a scalar just as the app config can, and every caller here expects an
+	 * array - so neither source may hand one out.
+	 *
+	 * @return array|null
+	 */
+	private function systemConfigOrNull(): ?array {
+		$config = $this->config->getSystemValue('openid-connect', null);
+		if ($config === null || \is_array($config)) {
+			return $config;
+		}
+		$this->logger->error(
+			'The openid-connect system config is not valid (expected an array, got ' . \gettype($config) . ')',
+			['app' => Application::APPID]
+		);
+		return null;
 	}
 
 	public function getAutoProvisionConfig(): array {
@@ -179,15 +209,38 @@ class Client extends OpenIDConnectClient {
 		$this->setAccessToken($token);
 		$payload = $this->getAccessTokenPayload();
 		if ($payload) {
+			// NOTE: this does not constrain the algorithm. The vendored library routes
+			// HS256/384/512 to an HMAC check against the *client secret* rather than
+			// the JWKS, and returns false rather than throwing - so an HS* token is
+			// refused for failing that check, not for being HS*, and one that does
+			// verify against the client secret is accepted.
 			if (!$this->verifyJWTsignature($token)) {
-				$this->logger->error('Token cannot be verified: ' . $token);
+				// the token itself stays out of the log: a token that fails
+				// verification because a key rotated out of the JWKS is still a live
+				// credential until it expires, and this line is at a level that is
+				// enabled by default.
+				$this->logger->error('Token cannot be verified: ' . $this->describeToken($token, $payload));
 				throw new OpenIDConnectClientException('Token cannot be verified.');
 			}
+			$this->assertIsAccessToken($payload);
 			$clientId = $config['client-id'] ?? $this->getClientID();
 			$this->verifyAudience($payload, $this->getExpectedAudiences($config, $clientId), isset($config['audience']), $clientId);
 			$this->logger->debug('Access token payload: ' . \json_encode($payload, JSON_THROW_ON_ERROR));
-			/* @phan-suppress-next-line PhanTypeExpectedObjectPropAccess */
-			return $payload->exp;
+			// RFC 9068 §2.2 makes "exp" REQUIRED in a JWT access token, and without
+			// one OpenIdConnectAuthModule::authToken() skips its expiry check
+			// altogether - "if ($expiry)" - so an unexpiring bearer credential would
+			// be honoured. Fail closed instead.
+			// int or float because RFC 7519 §2 defines NumericDate as a JSON number,
+			// not specifically an integer - but not a numeric *string*, which is not
+			// a JSON number at all. And "> 0" matters as much as the type: authToken()
+			// guards its expiry check with "if ($expiry)", so 0 and negative values
+			// would skip it exactly like a missing claim does.
+			$exp = $payload->exp ?? null;
+			if ((!\is_int($exp) && !\is_float($exp)) || $exp <= 0) {
+				$this->logger->error('Access token has no usable "exp" claim: ' . \json_encode($exp));
+				throw new OpenIDConnectClientException('Access token has no expiry');
+			}
+			return (int)$exp;
 		}
 
 		# use token introspection to verify the token
@@ -221,9 +274,14 @@ class Client extends OpenIDConnectClient {
 			$this->logger->error('Token (as per introspection) is inactive: ' . \json_encode($introData, JSON_THROW_ON_ERROR));
 			throw new OpenIDConnectClientException('Token (as per introspection) is inactive');
 		}
+		$this->assertIsAccessToken($introData);
 		$clientId = $config['client-id'] ?? $this->getClientID();
 		$this->verifyAudience($introData, $this->getExpectedAudiences($config, $clientId), isset($config['audience']), $clientId);
-		return $introData->exp;
+		// no "exp" requirement here, deliberately asymmetric to the JWT branch above:
+		// RFC 7662 §2.2 makes "exp" OPTIONAL in an introspection response, where
+		// "active": true is the authoritative statement and is re-checked per token.
+		// updateCache() in the auth module therefore has to tolerate a null expiry.
+		return $introData->exp ?? null;
 	}
 
 	/**
@@ -303,19 +361,6 @@ class Client extends OpenIDConnectClient {
 		bool $audienceIsAuthoritative,
 		?string $clientId
 	): void {
-		// Before anything else, and whatever the configuration says: a token that
-		// declares itself not to be an access token cannot authenticate as one.
-		// Checking it after the audience comparison would leave exactly the shapes
-		// that matter unguarded - a refresh token carrying the expected audience
-		// would be accepted by the comparison and never reach this point.
-		$marker = $this->nonAccessTokenMarker($payload);
-		if ($marker !== null) {
-			$this->logger->error(\sprintf(
-				'Token declares itself not to be an access token (%s) and cannot be used to authenticate one',
-				$marker
-			));
-			throw new OpenIDConnectClientException('Token is not an access token');
-		}
 		$audience = $payload->aud ?? null;
 		$audiences = \is_array($audience) ? $audience : [$audience];
 		foreach ($expectedAudiences as $expected) {
@@ -326,6 +371,7 @@ class Client extends OpenIDConnectClient {
 			}
 		}
 		if (!$audienceIsAuthoritative) {
+			$this->reportClientClaimMismatch($payload, $clientId);
 			$claim = $this->tokenNamesThisClient($payload, $clientId);
 			if ($claim !== null) {
 				// Only worth a word when the token carries an audience the admin
@@ -370,6 +416,15 @@ class Client extends OpenIDConnectClient {
 	 * it, which is the resource-server model working as intended and unchanged from
 	 * before this fallback existed.
 	 *
+	 * The claims are ordered by how authoritative they are, and the *first one
+	 * present* decides - not the first one that happens to match. Falling through a
+	 * present-but-different claim to a lower-precedence one would let a client on the
+	 * same issuer hand us a truthful "azp" naming itself alongside a hardcoded
+	 * "client_id" naming us, which several providers allow their tenants to
+	 * configure, and that token would pass while every claim in it was honest. No
+	 * provider sends two of these with conflicting values, so first-present costs
+	 * nothing in compatibility.
+	 *
 	 * What the fallback does not cover is a token this client obtained for a
 	 * different *resource* and had replayed here (RFC 8707, RFC 8693) - configuring
 	 * "audience" is what closes that, which is why it turns this fallback off.
@@ -377,20 +432,53 @@ class Client extends OpenIDConnectClient {
 	 * @param object $payload the decoded access token payload or the
 	 *                        introspection response
 	 * @param string|null $clientId the configured relying party client-id
-	 * @return string|null the claim that named us, null if none did
+	 * @return string|null the claim that named us, null if none did or if the most
+	 *                     authoritative one present named somebody else
 	 */
 	private function tokenNamesThisClient(object $payload, ?string $clientId): ?string {
 		if ($clientId === null || $clientId === '') {
 			return null;
 		}
 		foreach (['azp', 'appid', 'client_id'] as $claim) {
-			// strict: a numeric client-id must not match a numeric claim of a
-			// different type, the same trap the audience comparison avoids.
-			if (($payload->$claim ?? null) === $clientId) {
-				return $claim;
+			if (isset($payload->$claim)) {
+				// strict: a numeric client-id must not match a numeric claim of a
+				// different type, the same trap the audience comparison avoids.
+				return $clientId === $payload->$claim ? $claim : null;
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Says so when the claim that decided a rejection was a client-naming one, since
+	 * the audience mismatch logged afterwards names the audience and would otherwise
+	 * send an admin looking for a misconfigured "audience" that is not the problem.
+	 *
+	 * @param object $payload the decoded access token payload or the introspection
+	 *                        response
+	 * @param string|null $clientId the configured relying party client-id
+	 */
+	private function reportClientClaimMismatch(object $payload, ?string $clientId): void {
+		if ($clientId === null || $clientId === '') {
+			return;
+		}
+		foreach (['azp', 'appid', 'client_id'] as $claim) {
+			if (!isset($payload->$claim)) {
+				continue;
+			}
+			if ($clientId === $payload->$claim) {
+				return;
+			}
+			$this->logger->error(\sprintf(
+				'Token was issued to another client: "%s" is %s, this relying party is %s. '
+				. 'Lower-precedence claims are deliberately not consulted once a more '
+				. 'authoritative one names somebody else.',
+				$claim,
+				\json_encode($payload->$claim, JSON_UNESCAPED_SLASHES),
+				\json_encode($clientId, JSON_UNESCAPED_SLASHES)
+			));
+			return;
+		}
 	}
 
 	/**
@@ -408,35 +496,83 @@ class Client extends OpenIDConnectClient {
 	}
 
 	/**
-	 * The claim by which the token states that it is a refresh token rather than an
-	 * access token, formatted for a log line - null when it makes no such claim.
+	 * Refuses a token that states it is something other than an access token,
+	 * whatever its audience says - see nonAccessTokenMarker().
 	 *
-	 * Keycloak marks its refresh and offline tokens with "typ" ("Refresh",
-	 * "Offline"; an access token carries "Bearer"), AWS Cognito uses "token_use".
-	 * A token that says this of itself has no business authenticating anything,
-	 * whatever its audience is: a refresh token lives far longer than an access
-	 * token and is stored rather than passed around, so accepting one as a bearer
-	 * credential turns every place it rests into a login. Consulted before the
-	 * audience comparison and regardless of configuration, precisely because a
-	 * provider whose refresh tokens carry the expected audience would otherwise
-	 * have them accepted by that comparison.
+	 * Called from verifyToken() at the head of both branches rather than from
+	 * verifyAudience(): the audience checker's name, docblock and @throws are all
+	 * about audiences, and a guard hidden there is reachable only by remembering to
+	 * call it. Here it is structural instead.
 	 *
-	 * Keycloak's own refresh tokens do not reach this code - they are HS512 signed
-	 * with a key that is not in the published JWKS, so verifyJWTsignature() throws
-	 * first (verified against 26.0). That is a property of one provider's defaults,
-	 * not a guarantee, which is why the check does not rely on it.
+	 * @param object $claims the decoded access token payload or the introspection
+	 *                       response
+	 * @throws OpenIDConnectClientException
+	 */
+	private function assertIsAccessToken(object $claims): void {
+		$marker = $this->nonAccessTokenMarker($claims);
+		if ($marker === null) {
+			return;
+		}
+		$this->logger->error(\sprintf(
+			'Token states that it is not an access token (%s) and cannot be used to authenticate one',
+			$marker
+		));
+		throw new OpenIDConnectClientException('Token is not an access token');
+	}
+
+	/**
+	 * Identifies a token in a log line without reproducing it. A token that failed
+	 * verification can still be valid - a signing key rotated out of the JWKS is the
+	 * common case - so the value itself must not be written to a log that log
+	 * shippers and support bundles collect.
 	 *
-	 * ID tokens are deliberately not covered; see the README.
+	 * @param string $token
+	 * @param object|null $payload the decoded payload, where it is already available
+	 * @return string
+	 */
+	private function describeToken(string $token, ?object $payload = null): string {
+		// explode() always yields element 0, and base64_decode() in non-strict mode
+		// never returns false - so json_decode() is the only thing that can fail here,
+		// and it fails to null, which the ?? below already covers.
+		$header = \json_decode(\base64_decode(\strtr(\explode('.', $token)[0], '-_', '+/')), false);
+		return \sprintf(
+			'kid=%s alg=%s sub=%s',
+			\json_encode($header->kid ?? null),
+			\json_encode($header->alg ?? null),
+			\json_encode($payload->sub ?? null)
+		);
+	}
+
+	/**
+	 * Whether the token states that it is something other than an access token, and
+	 * how, formatted for a log line - null when it makes no such statement.
 	 *
-	 * @param object $payload
+	 * This is an allowlist on purpose. Enumerating the refresh markers would close
+	 * only what it enumerates: Keycloak's back-channel logout tokens ("typ" of
+	 * "Logout"), its registration and initial access tokens, and its ID tokens are
+	 * all realm-signed, carry an "aud" equal to the client-id, and would satisfy the
+	 * default expectation. So when a token labels its own type at all, that label has
+	 * to say "access token"; when it carries no label, there is nothing to go on and
+	 * the audience decides as before. Keycloak marks the type in "typ" ("Bearer" for
+	 * an access token), RFC 9068 §2.1 uses the "at+jwt" media type, AWS Cognito uses
+	 * "token_use". Entra ID and AD FS put no type claim in the payload, so nothing
+	 * changes for them.
+	 *
+	 * A refresh token is the reason this exists at all: it lives far longer than an
+	 * access token and is stored rather than passed around, so accepting one as a
+	 * bearer credential turns every place it rests into a login.
+	 *
+	 * @param object $payload the decoded access token payload or the
+	 *                        introspection response
 	 * @return string|null
 	 */
 	private function nonAccessTokenMarker(object $payload): ?string {
 		foreach (['typ', 'token_use'] as $claim) {
 			$value = $payload->$claim ?? null;
-			if (\is_string($value)
-				&& \in_array(\strtolower($value), ['refresh', 'refresh_token', 'offline'], true)
-			) {
+			if (!\is_string($value)) {
+				continue;
+			}
+			if (!\in_array(\strtolower($value), ['bearer', 'at+jwt', 'access', 'access_token'], true)) {
 				return \sprintf('"%s" is "%s"', $claim, $value);
 			}
 		}
@@ -457,7 +593,11 @@ class Client extends OpenIDConnectClient {
 			return;
 		}
 		$this->audienceFallbackReported = true;
-		$this->logger->warning(\sprintf(
+		// info, not warning: this fires for every provider the fallback exists for,
+		// which is the documented happy path rather than an anomaly, and the flag
+		// above only dedupes within a request. A warning on every token acquisition
+		// of every user would drown the log it is trying to inform.
+		$this->logger->info(\sprintf(
 			'Access token "aud" does not name this relying party, accepted because "%s" matches the configured client-id. '
 			. 'To have the audience enforced, set the openid-connect "audience" config key to what the provider sends '
 			. 'in "aud" - but only if that value is one only ownCloud can be issued a token for, since a shared or '

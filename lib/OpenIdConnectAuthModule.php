@@ -42,6 +42,13 @@ use OCP\IUserManager;
  * @package OCA\OpenIdConnect
  */
 class OpenIdConnectAuthModule implements IAuthModule {
+	/**
+	 * How long a token whose expiry is unknown may stay cached. Bounds how long such a
+	 * token keeps authenticating after the provider revokes it, since nothing else
+	 * can: the expiry check needs an expiry.
+	 */
+	private const UNKNOWN_EXPIRY_CACHE_TTL = 300;
+
 	/** @var IUserManager */
 	private $manager;
 	/** @var ILogger */
@@ -191,11 +198,24 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		return $user;
 	}
 
-	private function updateCache(string $bearerToken, IUser $user, int $expiry): void {
+	/**
+	 * Caching how long: an entry short-circuits verifyToken() completely - see the
+	 * cache read above - so its lifetime is how long a revoked token keeps working.
+	 *
+	 * With a known expiry that is bounded by the expiry check in authToken(), which
+	 * runs on every request and throws once the token is past it, so the entry may
+	 * live in the cache indefinitely. With no expiry the check cannot fire, and an
+	 * entry cached without a TTL would authenticate that token forever - so those get
+	 * an explicit short TTL instead. $expiry is nullable in the first place because an
+	 * introspection response may legitimately carry no "exp" (RFC 7662 §2.2), and
+	 * because a TypeError here escapes the OpenIDConnectClientException handler in
+	 * authToken() as a 500 rather than a 401.
+	 */
+	private function updateCache(string $bearerToken, IUser $user, ?int $expiry): void {
 		$cache = $this->getCache();
 		$cache->set($bearerToken, [
 			'uid' => $user->getUID(),
 			'exp' => $expiry
-		]);
+		], $expiry === null ? self::UNKNOWN_EXPIRY_CACHE_TTL : 0);
 	}
 }
