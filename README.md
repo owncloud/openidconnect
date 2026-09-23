@@ -52,12 +52,21 @@ realm with a hardcoded-claim mapper, where every claim in the token is honest.
 
 Regardless of audience, a token that labels its own type has to label itself an
 access token: `typ` of `Bearer` (Keycloak) or `at+jwt` (RFC 9068 §2.1), `token_use`
-of `access` (AWS Cognito). Anything else is refused. That is an allowlist rather than
-a list of refresh markers on purpose - Keycloak's refresh, offline, back-channel
-logout, registration and ID tokens are all realm-signed and carry an `aud` equal to
-the `client-id`, so an enumeration would have to keep up with each of them, and a
-refresh token in particular is long-lived and kept at rest, so it must never double
-as a bearer credential.
+of `access` (AWS Cognito). Anything else is refused. That is an allowlist rather than a
+list of refresh markers on purpose - Keycloak's refresh, offline, back-channel logout,
+registration and ID tokens are all realm-signed and carry an `aud` equal to the
+`client-id`, so an enumeration would have to keep up with each of them, and a refresh
+token in particular is long-lived and kept at rest, so it must never double as a bearer
+credential.
+
+The generic JOSE media type `jwt` is refused along with the rest, although it says
+nothing about the token's type. A provider that stamps it into the payload - by copying
+the header `typ`, where Keycloak carries exactly that value - stamps it on every token
+it signs, refresh tokens included, so allowing it would switch this check off for
+precisely the provider it would be meant to accommodate. There is no setting that
+relaxes it either - the check runs before the audience is looked at and reads nothing
+from the configuration - so a provider that labels its access tokens that way needs a
+change in the app, not a change in `config.php`.
 
 A provider that puts no type claim in the payload is unaffected, which includes Entra
 ID and AD FS. There, an ID token still satisfies the default expectation, because an
