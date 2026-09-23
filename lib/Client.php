@@ -32,6 +32,13 @@ use OCP\IURLGenerator;
 use OCP\ILogger;
 
 class Client extends OpenIDConnectClient {
+	/**
+	 * The claims that can name the client a token was issued to, most authoritative
+	 * first. The order is security relevant - see tokenNamesThisClient() - so it is
+	 * declared once and walked once, in decidingClientClaim().
+	 */
+	private const CLIENT_NAMING_CLAIMS = ['azp', 'appid', 'client_id'];
+
 	/** @var ISession */
 	private $session;
 	/** @var IConfig */
@@ -123,7 +130,7 @@ class Client extends OpenIDConnectClient {
 					'Loaded config from DB is not valid (malformed JSON); JSON Last Error: ' . json_last_error(),
 					['app' => Application::APPID]
 				);
-				return $this->config->getSystemValue('openid-connect', null);
+				return $this->systemConfigOrNull();
 			}
 			// "123", "true" and bare strings are valid JSON, so json_last_error()
 			// says nothing about them - and a scalar here reaches callers that expect
@@ -232,15 +239,15 @@ class Client extends OpenIDConnectClient {
 			// be honoured. Fail closed instead.
 			// int or float because RFC 7519 §2 defines NumericDate as a JSON number,
 			// not specifically an integer - but not a numeric *string*, which is not
-			// a JSON number at all. And "> 0" matters as much as the type: authToken()
-			// guards its expiry check with "if ($expiry)", so 0 and negative values
-			// would skip it exactly like a missing claim does.
+			// a JSON number at all. What counts as usable beyond that is in
+			// usableExpiry().
 			$exp = $payload->exp ?? null;
-			if ((!\is_int($exp) && !\is_float($exp)) || $exp <= 0) {
+			$expiry = (\is_int($exp) || \is_float($exp)) ? $this->usableExpiry($exp) : null;
+			if ($expiry === null) {
 				$this->logger->error('Access token has no usable "exp" claim: ' . \json_encode($exp));
 				throw new OpenIDConnectClientException('Access token has no expiry');
 			}
-			return (int)$exp;
+			return $expiry;
 		}
 
 		# use token introspection to verify the token
@@ -277,11 +284,35 @@ class Client extends OpenIDConnectClient {
 		$this->assertIsAccessToken($introData);
 		$clientId = $config['client-id'] ?? $this->getClientID();
 		$this->verifyAudience($introData, $this->getExpectedAudiences($config, $clientId), isset($config['audience']), $clientId);
-		// no "exp" requirement here, deliberately asymmetric to the JWT branch above:
+		// No "exp" requirement here, deliberately asymmetric to the JWT branch above:
 		// RFC 7662 §2.2 makes "exp" OPTIONAL in an introspection response, where
-		// "active": true is the authoritative statement and is re-checked per token.
-		// updateCache() in the auth module therefore has to tolerate a null expiry.
-		return $introData->exp ?? null;
+		// "active": true is the authoritative statement. That statement is only
+		// re-checked when this method actually runs, which is per cache *miss* rather
+		// than per request - the auth module's cache short-circuits verification
+		// entirely - so what bounds an entry with no expiry is the TTL that
+		// updateCache() gives it. updateCache() therefore has to tolerate null.
+		//
+		// A present "exp" still has to be usable before it is handed on - see
+		// usableExpiry() - because authToken() computes "$expiry - time()", where a
+		// non-numeric string raises a TypeError, and a TypeError is not an
+		// OpenIDConnectClientException: it escapes the handler as a 500 instead of a 401.
+		// An unusable value degrades to "unknown" rather than rejecting the token: it is
+		// the provider's bug, the bounded TTL already covers it, and a 401 would be one
+		// more deployment locked out by a patch release. Numeric strings count here,
+		// unlike in the JWT branch, where "exp" is REQUIRED and failing closed is the
+		// whole point.
+		$exp = $introData->exp ?? null;
+		if ($exp === null) {
+			return null;
+		}
+		$expiry = \is_numeric($exp) ? $this->usableExpiry($exp + 0) : null;
+		if ($expiry === null) {
+			$this->logger->error(
+				'Introspection response carries an unusable "exp" claim, treating the expiry as unknown: '
+				. \json_encode($exp)
+			);
+		}
+		return $expiry;
 	}
 
 	/**
@@ -416,14 +447,17 @@ class Client extends OpenIDConnectClient {
 	 * it, which is the resource-server model working as intended and unchanged from
 	 * before this fallback existed.
 	 *
-	 * The claims are ordered by how authoritative they are, and the *first one
-	 * present* decides - not the first one that happens to match. Falling through a
-	 * present-but-different claim to a lower-precedence one would let a client on the
-	 * same issuer hand us a truthful "azp" naming itself alongside a hardcoded
-	 * "client_id" naming us, which several providers allow their tenants to
+	 * The claims are ordered by how authoritative they are, and the first one that
+	 * carries a value decides - not the first one that happens to match. Falling
+	 * through a claim naming somebody else to a lower-precedence one would let a
+	 * client on the same issuer hand us a truthful "azp" naming itself alongside a
+	 * hardcoded "client_id" naming us, which several providers allow their tenants to
 	 * configure, and that token would pass while every claim in it was honest. No
-	 * provider sends two of these with conflicting values, so first-present costs
-	 * nothing in compatibility.
+	 * provider sends two of these with conflicting values, so deciding on the first
+	 * costs nothing in compatibility. A claim explicitly set to JSON null carries no
+	 * name, so it does not decide and the next one is consulted - no provider emits
+	 * that, and it could not help an attacker if one did, since the only alternative
+	 * to falling through is a rejection.
 	 *
 	 * What the fallback does not cover is a token this client obtained for a
 	 * different *resource* and had replayed here (RFC 8707, RFC 8693) - configuring
@@ -433,17 +467,39 @@ class Client extends OpenIDConnectClient {
 	 *                        introspection response
 	 * @param string|null $clientId the configured relying party client-id
 	 * @return string|null the claim that named us, null if none did or if the most
-	 *                     authoritative one present named somebody else
+	 *                     authoritative one carrying a value named somebody else
 	 */
 	private function tokenNamesThisClient(object $payload, ?string $clientId): ?string {
 		if ($clientId === null || $clientId === '') {
 			return null;
 		}
-		foreach (['azp', 'appid', 'client_id'] as $claim) {
+		$claim = $this->decidingClientClaim($payload);
+		if ($claim === null) {
+			return null;
+		}
+		// strict: a numeric client-id must not match a numeric claim of a different
+		// type, the same trap the audience comparison avoids.
+		return $clientId === $payload->$claim ? $claim : null;
+	}
+
+	/**
+	 * The client-naming claim that decides, i.e. the most authoritative one the token
+	 * carries a value for - null when it carries none. "Carries a value" and not merely
+	 * "is present": a claim set to JSON null names nobody, so it cannot decide.
+	 *
+	 * One walk for both callers on purpose. tokenNamesThisClient() decides on this
+	 * order and reportClientClaimMismatch() explains the decision, so a second copy of
+	 * the order could drift from it: change one and the log line would describe a
+	 * decision the code did not make, or the rejection would go silent about its reason.
+	 *
+	 * @param object $payload the decoded access token payload or the introspection
+	 *                        response
+	 * @return string|null
+	 */
+	private function decidingClientClaim(object $payload): ?string {
+		foreach (self::CLIENT_NAMING_CLAIMS as $claim) {
 			if (isset($payload->$claim)) {
-				// strict: a numeric client-id must not match a numeric claim of a
-				// different type, the same trap the audience comparison avoids.
-				return $clientId === $payload->$claim ? $claim : null;
+				return $claim;
 			}
 		}
 		return null;
@@ -462,13 +518,8 @@ class Client extends OpenIDConnectClient {
 		if ($clientId === null || $clientId === '') {
 			return;
 		}
-		foreach (['azp', 'appid', 'client_id'] as $claim) {
-			if (!isset($payload->$claim)) {
-				continue;
-			}
-			if ($clientId === $payload->$claim) {
-				return;
-			}
+		$claim = $this->decidingClientClaim($payload);
+		if ($claim !== null && $clientId !== $payload->$claim) {
 			$this->logger->error(\sprintf(
 				'Token was issued to another client: "%s" is %s, this relying party is %s. '
 				. 'Lower-precedence claims are deliberately not consulted once a more '
@@ -477,8 +528,44 @@ class Client extends OpenIDConnectClient {
 				\json_encode($payload->$claim, JSON_UNESCAPED_SLASHES),
 				\json_encode($clientId, JSON_UNESCAPED_SLASHES)
 			));
-			return;
 		}
+	}
+
+	/**
+	 * A NumericDate claim as the number of seconds the callers can actually work with,
+	 * or null when it is not one.
+	 *
+	 * What "unusable" has to mean here is set by what the callers do with the result.
+	 * OpenIdConnectAuthModule::authToken() guards its expiry check with "if ($expiry)", so
+	 * anything the cast turns into 0 skips that check exactly like a missing claim does -
+	 * while updateCache() reads it as a *known* expiry and caches the token with no TTL at
+	 * all. And casting a float PHP cannot hold is undefined: it wraps two's-complement, so
+	 * an out-of-range claim can land on a plausible far-future expiry, which then gets
+	 * cached forever. That is the worst outcome available here.
+	 *
+	 * Hence three tests, and each one is the only thing standing between one input and
+	 * that outcome - every other unusable value is caught redundantly by all three:
+	 *
+	 * - the floor catches claims below the int range. -1e19 casts to 8446744073709551616,
+	 *   so a *negative* claim would otherwise come out as a far-future expiry.
+	 * - the ceiling catches claims above it, 2e19 casting to 1553255926290448384. It also
+	 *   catches INF, which no comparison below would.
+	 * - the test after the cast catches exactly 2^63, which is not *greater* than
+	 *   PHP_INT_MAX once both are floats, yet casts to PHP_INT_MIN.
+	 *
+	 * All three are mutation-tested, and each has a data row that fails without it. An
+	 * earlier version also called is_finite() and compared "$exp <= 0"; both of those
+	 * mutated away with the suite still green, so they are gone rather than test-papered.
+	 *
+	 * @param int|float $exp
+	 * @return int|null
+	 */
+	private function usableExpiry($exp): ?int {
+		if (!($exp >= 1 && $exp <= \PHP_INT_MAX)) {
+			return null;
+		}
+		$seconds = (int)$exp;
+		return $seconds > 0 ? $seconds : null;
 	}
 
 	/**
@@ -555,8 +642,20 @@ class Client extends OpenIDConnectClient {
 	 * to say "access token"; when it carries no label, there is nothing to go on and
 	 * the audience decides as before. Keycloak marks the type in "typ" ("Bearer" for
 	 * an access token), RFC 9068 §2.1 uses the "at+jwt" media type, AWS Cognito uses
-	 * "token_use". Entra ID and AD FS put no type claim in the payload, so nothing
-	 * changes for them.
+	 * "token_use" - "access", and "access_token" is accepted for it too. Any of the four
+	 * values is accepted in either claim, but *every* label the token carries has to be
+	 * one of them: the loop below rejects on the first that is not. Entra ID and AD FS put
+	 * no type claim in the payload, so nothing changes for them.
+	 *
+	 * The generic JOSE media type "jwt" is deliberately *not* on the list, though it does
+	 * say nothing about the token's type. A provider that stamps it into the payload -
+	 * by copying the header "typ", which is where Keycloak carries exactly that value -
+	 * stamps it on every token it signs, refresh tokens included. Allowing it would
+	 * therefore trade a hypothetical outage for a hypothetical refresh token becoming a
+	 * bearer credential, on the same hypothetical provider, and the second is the reason
+	 * this check exists. Note that there is no configuration that relaxes this: the
+	 * check runs before the audience is looked at and reads nothing from the config, so
+	 * such a provider would need a change here, not a setting.
 	 *
 	 * A refresh token is the reason this exists at all: it lives far longer than an
 	 * access token and is stored rather than passed around, so accepting one as a

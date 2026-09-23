@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- [#374](https://github.com/owncloud/openidconnect/pull/374) - fix: do not fail with a server error when the token introspection response carries no expiry
 - [#374](https://github.com/owncloud/openidconnect/pull/374) - fix: only accept a token that labels itself an access token
 - [#374](https://github.com/owncloud/openidconnect/pull/374) - fix: accept an access token that names this client in azp, appid or client_id
 

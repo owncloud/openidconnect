@@ -68,10 +68,14 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 	 * @var MockObject | AutoProvisioningService
 	 */
 	private $autoProvisioningService;
+	/**
+	 * @var MockObject | IUserManager
+	 */
+	private $manager;
 
 	protected function setUp(): void {
 		parent::setUp();
-		$manager = $this->createMock(IUserManager::class);
+		$this->manager = $this->createMock(IUserManager::class);
 		$this->logger = $this->createMock(ILogger::class);
 		$this->cacheFactory = $this->createMock(ICacheFactory::class);
 		$this->lookupService = $this->createMock(UserLookupService::class);
@@ -87,7 +91,7 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 
 		$this->autoProvisioningService = $this->createMock(AutoProvisioningService::class);
 		$this->authModule = new OpenIdConnectAuthModule(
-			$manager,
+			$this->manager,
 			$this->logger,
 			$this->cacheFactory,
 			$this->lookupService,
@@ -191,6 +195,50 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		$request->method('getHeader')->willReturn('Bearer 1234567890');
 
 		self::assertEquals($user, $this->authModule->auth($request));
+	}
+
+	/**
+	 * The TTL above only bounds anything if the entry ages from when it was written.
+	 * A cached request resolves both the expiry and the user from the cache, so writing
+	 * the entry again there would hand it a fresh TTL on every request - and any client
+	 * polling more often than the TTL, which every sync client does, would keep a
+	 * revoked token alive indefinitely. So a cache hit must not write.
+	 *
+	 * @throws \JsonException
+	 */
+	public function testAnUnknownExpiryIsNotRefreshedOnACacheHit(): void {
+		$ttls = [];
+		$user = $this->stubAnIntrospectedTokenWithNoExpiry($ttls);
+		// once, not per request: the second request has to be served from the cache,
+		// which is the whole point - introspection is what would notice a revocation
+		$this->client->expects(self::once())->method('introspectToken')
+			->willReturn((object)['active' => true, 'aud' => 'client-id']);
+		$request = $this->requestWithToken('1234567890');
+
+		self::assertEquals($user, $this->authModule->auth($request));
+		self::assertEquals($user, $this->authModule->auth($request));
+
+		self::assertSame([300], $ttls);
+	}
+
+	/**
+	 * And that suppression is per verification rather than per instance: a second token
+	 * seen by the same request-scoped module still gets an entry. Otherwise one cache
+	 * hit would stop everything after it from being cached at all.
+	 *
+	 * @throws \JsonException
+	 */
+	public function testACacheHitDoesNotSuppressTheNextTokensEntry(): void {
+		$ttls = [];
+		$user = $this->stubAnIntrospectedTokenWithNoExpiry($ttls);
+		$this->client->expects(self::exactly(2))->method('introspectToken')
+			->willReturn((object)['active' => true, 'aud' => 'client-id']);
+
+		$this->authModule->auth($this->requestWithToken('1234567890'));
+		$this->authModule->auth($this->requestWithToken('1234567890'));
+		self::assertEquals($user, $this->authModule->auth($this->requestWithToken('9876543210')));
+
+		self::assertSame([300, 300], $ttls);
 	}
 
 	/**
@@ -310,5 +358,41 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 		$this->autoProvisioningService->expects(self::once())->method('updateAccountInfo')->with($user, $userInfo)->willReturnCallback(function () {
 		});
 		$this->authModule->auth($request);
+	}
+
+	/**
+	 * An introspected token with no "exp", against a cache that actually stores - the
+	 * ArrayCache in core discards the TTL, and a bare mock never returns a hit, so
+	 * neither can show what happens on a second request.
+	 *
+	 * @param array $ttls filled with the TTL of every write, in order
+	 * @return MockObject | IUser the user every request resolves to
+	 */
+	private function stubAnIntrospectedTokenWithNoExpiry(array &$ttls) {
+		$store = [];
+		$cache = $this->createMock(ICache::class);
+		$cache->method('get')->willReturnCallback(static function ($key) use (&$store) {
+			return $store[$key] ?? null;
+		});
+		$cache->method('set')->willReturnCallback(static function ($key, $value, $ttl = 0) use (&$store, &$ttls) {
+			$store[$key] = $value;
+			$ttls[] = $ttl;
+			return true;
+		});
+		$this->cacheFactory->method('create')->willReturn($cache);
+
+		$this->client->method('getOpenIdConfig')->willReturn(['client-id' => 'client-id']);
+		$this->client->method('getUserInfo')->willReturn((object)['email' => 'foo@example.com']);
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('alice');
+		$this->manager->method('get')->with('alice')->willReturn($user);
+		$this->lookupService->method('lookupUser')->willReturn($user);
+		return $user;
+	}
+
+	private function requestWithToken(string $token): IRequest {
+		$request = $this->createMock(IRequest::class);
+		$request->method('getHeader')->willReturn("Bearer $token");
+		return $request;
 	}
 }

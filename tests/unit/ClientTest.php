@@ -144,6 +144,28 @@ class ClientTest extends TestCase {
 	}
 
 	/**
+	 * The scalar filter has to cover the *malformed JSON* path too, which the provider
+	 * above cannot show because it always hands back an array from config.php. Without
+	 * it, a malformed app config plus a scalar in config.php still returns that scalar,
+	 * which is the case the filter exists for: callers take ?array, a string is never
+	 * coerced to one, and the resulting TypeError is not an OpenIDConnectClientException
+	 * - the auth module's handler does not catch it, so the request 500s instead of
+	 * returning 401.
+	 *
+	 * @throws JsonException
+	 */
+	public function testAScalarSystemConfigIsRefusedOnTheMalformedAppConfigPathToo(): void {
+		$this->config->method('getSystemValue')->willReturn('https://idp.example.net');
+		$this->config->method('getAppValue')->willReturn('{[s');
+		$this->logger->expects(self::exactly(2))->method('error')->withConsecutive(
+			['Loaded config from DB is not valid (malformed JSON); JSON Last Error: 4', self::anything()],
+			['The openid-connect system config is not valid (expected an array, got string)', self::anything()]
+		);
+
+		self::assertNull($this->client->getOpenIdConfig());
+	}
+
+	/**
 	 * @throws OpenIDConnectClientException
 	 * @throws JsonException
 	 */
@@ -1125,6 +1147,19 @@ class ClientTest extends TestCase {
 			// would skip the expiry check exactly like a missing claim
 			'zero' => [0],
 			'negative' => [-1],
+			// a JSON number, greater than zero, and casts to 0 - which "if ($expiry)"
+			// reads as false exactly like a missing claim
+			'positive but casts to zero' => [0.5],
+			// beyond int range, and wrapping to a plausible *positive* int - which the
+			// cast check alone cannot catch
+			'beyond int range' => [2e19],
+			// the wrap is symmetric, so a value below the range comes out positive too:
+			// -1e19 casts to 8446744073709551616, a far-future expiry
+			'below int range' => [-1e19],
+			// the boundary, spelled out rather than written as (float)PHP_INT_MAX, which
+			// is only this value on a 64-bit build: 2^63 is not *greater* than
+			// PHP_INT_MAX once both are floats, yet casts to PHP_INT_MIN
+			'exactly two to the sixty-third' => [9223372036854775808.0],
 		];
 	}
 
@@ -1195,6 +1230,105 @@ class ClientTest extends TestCase {
 	}
 
 	/**
+	 * What an introspection response can carry as "exp" that is not usable as one.
+	 * Deliberately not the same list as providesUnusableExpiries(): a numeric string
+	 * is accepted here, see below.
+	 *
+	 * @return array<string, array{mixed}>
+	 */
+	public function providesUnusableIntrospectedExpiries(): array {
+		return [
+			// reaches "$expiry - time()" in the auth module and raises a TypeError
+			// there, which is not an OpenIDConnectClientException and so escapes the
+			// handler as a 500 instead of a 401
+			'non-numeric string' => ['not-a-date'],
+			'bool' => [true],
+			'array' => [[1789990000]],
+			// "if ($expiry)" reads both of these as false, so they would skip the
+			// expiry check exactly like a missing claim does
+			'zero' => [0],
+			'negative' => [-1],
+			// same two traps as on the JWT branch, and here they would produce an entry
+			// with no TTL rather than a rejection
+			'positive but casts to zero' => [0.5],
+			'beyond int range' => [2e19],
+			'below int range' => [-1e19],
+			// the one way INF actually reaches the check: as a numeric string, which the
+			// debug encode above does not choke on because the response holds a string
+			'numeric string overflowing to INF' => ['1e400'],
+			// the boundary, spelled out rather than written as (float)PHP_INT_MAX, which
+			// is only this value on a 64-bit build: 2^63 is not *greater* than
+			// PHP_INT_MAX once both are floats, yet casts to PHP_INT_MIN
+			'exactly two to the sixty-third' => [9223372036854775808.0],
+		];
+	}
+
+	/**
+	 * An unusable "exp" degrades to "unknown" here instead of refusing the token, unlike
+	 * on the JWT branch: "exp" is OPTIONAL in an introspection response (RFC 7662 §2.2)
+	 * with "active" as the authority and the short cache TTL in the auth module as the
+	 * bound, so the unknown case is already covered - whereas a 401 would be one more
+	 * deployment locked out over a provider's formatting quirk.
+	 *
+	 * @dataProvider providesUnusableIntrospectedExpiries
+	 * @param mixed $exp
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenIntrospectionTreatsAnUnusableExpiryAsUnknown($exp): void {
+		$this->client = $this->buildClientForIntrospection([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], ['active' => true, 'client_id' => 'owncloud-client', 'exp' => $exp]);
+
+		// said out loud, because the symptom is otherwise a token that never expires
+		$this->logger->expects(self::once())
+			->method('error')
+			->with(self::stringContains('unusable "exp"'));
+
+		self::assertNull($this->client->verifyToken('some-opaque-token'));
+	}
+
+	/**
+	 * A provider that serialises "exp" as a string is not broken as far as this code is
+	 * concerned - PHP subtracts a numeric string happily, so that shape works today and
+	 * refusing it would be a regression rather than a hardening.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenIntrospectionAcceptsANumericStringExpiry(): void {
+		$exp = \time() + 3600;
+		$this->client = $this->buildClientForIntrospection([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], ['active' => true, 'client_id' => 'owncloud-client', 'exp' => (string)$exp]);
+
+		self::assertSame($exp, $this->client->verifyToken('some-opaque-token'));
+	}
+
+	/**
+	 * And a non-integral one, which RFC 7519 §2 permits, comes back as an int rather
+	 * than as a float that raises "Implicit conversion from float ... loses precision"
+	 * against updateCache()'s ?int parameter.
+	 *
+	 * @throws JsonException
+	 * @throws OpenIDConnectClientException
+	 */
+	public function testVerifyTokenIntrospectionAcceptsANonIntegralExpiry(): void {
+		$exp = \time() + 3600.75;
+		$this->client = $this->buildClientForIntrospection([
+			'provider-url' => 'https://example.net',
+			'client-id' => 'owncloud-client',
+			'client-secret' => 'secret',
+		], ['active' => true, 'client_id' => 'owncloud-client', 'exp' => $exp]);
+
+		self::assertSame((int)$exp, $this->client->verifyToken('some-opaque-token'));
+	}
+
+	/**
 	 * Everything a provider can label a token as that is not an access token. The
 	 * check is an allowlist, so this list does not have to be exhaustive for the
 	 * guard to hold - which is the point of inverting it.
@@ -1219,6 +1353,10 @@ class ClientTest extends TestCase {
 			'cognito id token' => ['token_use', 'id'],
 			'keycloak registration token' => ['typ', 'RegistrationAccessToken'],
 			'keycloak initial access token' => ['typ', 'InitialAccessToken'],
+			// the generic JOSE media type says nothing about the token's type, so a
+			// provider that stamps it into the payload stamps it on its refresh tokens
+			// too - allowing it here would switch the guard off for that provider
+			'generic jose media type' => ['typ', 'JWT'],
 		];
 	}
 
