@@ -11,6 +11,30 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 - [#356](https://github.com/owncloud/openidconnect/pull/356) - fix: verify token audience to prevent cross-client account takeover
 - [#365](https://github.com/owncloud/openidconnect/pull/365) - fix: verify token audience for introspected opaque tokens
 
+### Changed
+
+- The audience of an access token is now verified. 2.3.4 and earlier ran no audience check at
+  all - on JWT or opaque tokens - so this is the first 2.3.x release that can refuse a token an
+  earlier one accepted. That is the point of the fixes above, but it is a behaviour change to
+  plan for before upgrading:
+  - a token whose `aud` names this client is accepted. When `aud` does not name it, the first of
+    `azp`, `appid`, `client_id` that the token carries decides on its own - so a token whose
+    `azp` names another client is refused even if a later claim names this one
+  - an introspection response carrying no `aud` and none of those claims, which RFC 7662 §2.2
+    permits, is refused
+  - set the new `audience` config key when the identity provider's access token names a resource
+    rather than this client. It **replaces** the client-id in the expected set rather than adding
+    to it, and switches the `azp`/`appid`/`client_id` fallback off - so a token whose `aud` names
+    the client-id and not the configured audience is then refused. An empty string or an empty
+    array refuses every token
+  - a token that labels its own type has to label itself an access token: a string `typ` or
+    `token_use` claim - in the token payload or in the introspection response - must be one of
+    `bearer`, `at+jwt`, `access` or `access_token`, compared case-insensitively. Tokens carrying
+    no type claim are unaffected, and no setting relaxes this
+  - a JWT's `exp` has to be a JSON number. `"exp": "1790000000"`, `"exp": 0` and a fractional
+    expiry were previously accepted by numeric coercion and are now refused, and a JWT carrying
+    no `exp` at all now ends the browser session instead of leaving it signed in
+
 ### Added
 
 - [#374](https://github.com/owncloud/openidconnect/pull/374) - feat: add the `audience` config key for the expected access token audience
