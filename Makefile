@@ -80,6 +80,12 @@ distdir:
 	mkdir -p $(dist_dir)/$(app_name)
 	cp -R $(all_src) $(dist_dir)/$(app_name)
 	rm -Rf $(dist_dir)/$(app_name)/l10n/.tx
+# appinfo/ is copied wholesale and signature.json is not gitignored, so one left
+# behind in the source tree - by a stray `integrity:sign-app --path=.`, or by
+# getting committed - would travel into the package. With no key present there is
+# no re-sign to overwrite it, and it would then be packaged as a signature whose
+# hashes describe a different tree.
+	rm -f $(dist_dir)/$(app_name)/appinfo/signature.json
 
 .PHONY: sign
 sign:
@@ -91,6 +97,52 @@ endif
 
 .PHONY: package
 package:
+# This branch targets ownCloud 10, whose integrity checker reads a single
+# `certificate` and RSA/PSS only - it has no dispatch on the `v`/`alg` fields the
+# current signature format adds. A package signed in that newer format fails
+# integrity:check-app with "App Certificate is not valid" on every oc10 install,
+# which is exactly what shipped as v2.3.4. Refuse to package one.
+#
+# This checks the envelope format, not whether the certificate chains to core's
+# root - it cannot: `occ integrity:check-app` is useless here because
+# Checker::isCodeCheckEnforced() returns false for the `git` channel, so any occ
+# reachable from a build tree reports success unconditionally. The authoritative
+# check is installing the built artifact into a real owncloud/server:10.16.x and
+# running integrity:check-app there, which is part of cutting a release on this
+# line. Classification matches core's own (v/certificates => current), and
+# anything it cannot classify fails rather than passing.
+#
+# An unsigned build is tolerated by default, because that is what CI produces -
+# the trivy workflow builds the dist tree with no signing secrets. Pass
+# REQUIRE_SIGNATURE=1 to reject it, which is what cutting a release does:
+# CAN_SIGN degrades to a printed message when the key, the cert or occ is
+# missing, so without that the release path can hand back an unsigned tarball
+# and exit 0.
+#
+# Which format is required is read from appinfo/info.xml's max-version rather
+# than hardcoded, so this hunk is inert rather than harmful if it is ever merged
+# or cherry-picked towards a branch targeting ownCloud 11. The version is parsed
+# as XML, not by line-matching, so reformatting info.xml cannot silently disable
+# the check - an unreadable max-version is an error, like an unclassifiable
+# signature. That test has to come before the unsigned one, or REQUIRE_SIGNATURE=1
+# on an ownCloud 11 branch would fail a build this check has no opinion about.
+	@verdict=$$(php -d display_errors=0 -d error_reporting=0 -r '$$xml = @simplexml_load_file($$argv[1]); $$max = $$xml === false ? null : (string)($$xml->dependencies->owncloud["max-version"] ?? ""); if ($$max === null || $$max === "") { echo "noversion"; exit; } if ($$max !== "10" && \strpos($$max, "10.") !== 0) { echo "notoc10"; exit; } if (!\file_exists($$argv[2])) { echo "unsigned"; exit; } $$d = json_decode(file_get_contents($$argv[2]), true); if (!\is_array($$d)) { echo "unclassifiable"; } elseif (isset($$d["v"]) || isset($$d["certificates"])) { echo "current"; } elseif (isset($$d["certificate"], $$d["hashes"], $$d["signature"])) { echo "legacy"; } else { echo "unclassifiable"; }' appinfo/info.xml "$(dist_dir)/$(app_name)/appinfo/signature.json" 2>/dev/null); \
+	case "$$verdict" in \
+		legacy|notoc10) ;; \
+		unsigned) case "$(REQUIRE_SIGNATURE)" in \
+				''|0|no|false) ;; \
+				*) echo "ERROR: REQUIRE_SIGNATURE was asked for but the package is unsigned."; \
+					echo "       $(sign_skip_msg)"; exit 1;; \
+			esac;; \
+		current) echo "ERROR: appinfo/signature.json is in the current signature format, which ownCloud 10 cannot verify."; \
+			echo "       Sign this release line with occ integrity:sign-app and its G1 key."; exit 1;; \
+		noversion) echo "ERROR: could not read max-version from appinfo/info.xml, so the required"; \
+			echo "       signature format is unknown. Refusing to package."; exit 1;; \
+		'') echo "ERROR: php produced no verdict. Is php on PATH and built with simplexml?"; \
+			echo "       Refusing to package without checking the signature."; exit 1;; \
+		*) echo "ERROR: could not classify appinfo/signature.json (php said '$$verdict')."; \
+			echo "       Refusing to package a signature that cannot be checked."; exit 1;; \
+	esac
 	tar -czf $(dist_dir)/$(app_name).tar.gz -C $(dist_dir) $(app_name)
 
 ##
