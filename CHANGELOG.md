@@ -20,6 +20,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 - [#374](https://github.com/owncloud/openidconnect/pull/374) - fix: do not fail with a server error when the token introspection response carries no expiry
 - [#374](https://github.com/owncloud/openidconnect/pull/374) - fix: only accept a token that labels itself an access token
 - [#374](https://github.com/owncloud/openidconnect/pull/374) - fix: accept an access token that names this client in azp, appid or client_id
+- [#368](https://github.com/owncloud/openidconnect/pull/368) - ship an artifact whose code signature
+  ownCloud 10 can verify. The v2.3.4 package was signed in the current signature format, which
+  ownCloud 10's integrity checker does not understand: it reads a single `certificate` field and
+  only RSA/PSS signatures, so the app failed `occ integrity:check-app openidconnect` with *App
+  Certificate is not valid* on every ownCloud 10 install, and the code-integrity warning appeared
+  in admin settings. The release workflow is removed from this branch, since it can only produce
+  the newer format; this release line is built and signed locally instead.
 
 
 ## [2.3.4] - 2026-08-21
