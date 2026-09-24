@@ -6,14 +6,48 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] - XXXX-XX-XX
 
+## [2.4.2] - 2026-09-24
+
+### Security
+- [#365](https://github.com/owncloud/openidconnect/pull/365) - fix: verify token audience for introspected opaque tokens
+
+### Changed
+
+Three checks can refuse an access token that 2.4.1 accepted. Read them before upgrading -
+2.4.2 otherwise widens what is accepted, most importantly for Keycloak, Entra ID v1.0, AD FS
+and OneLogin, which 2.4.1 locked out entirely.
+
+- [#365](https://github.com/owncloud/openidconnect/pull/365) - **opaque access tokens are now
+  audience-checked too.** 2.4.1 verified the audience of JWT access tokens only; an introspected
+  opaque token was accepted on `active` alone. Such a token is now accepted when `aud` names this
+  client, and otherwise when the first of `azp`, `appid`, `client_id` that the response carries
+  names it - that first claim decides on its own, so a response whose `azp` names another client
+  is refused even if a later claim names this one. An introspection response carrying no `aud`
+  and none of those claims, which RFC 7662 §2.2 permits, is refused; configure `audience` if the
+  provider puts a resource name in `aud`.
+- [#374](https://github.com/owncloud/openidconnect/pull/374) - **a token that labels its own type
+  has to label itself an access token.** A string `typ` or `token_use` claim - in the token
+  payload or in the introspection response - must be one of `bearer`, `at+jwt`, `access` or
+  `access_token`, compared case-insensitively. Tokens carrying no type claim are unaffected, which
+  covers Entra ID and AD FS. No configuration relaxes this: a provider that copies the JOSE
+  header's generic `jwt` into the payload stamps that same value on its refresh tokens, and
+  keeping a refresh token out of bearer auth is why the check exists.
+- [#374](https://github.com/owncloud/openidconnect/pull/374) - **a JWT's `exp` has to be a JSON
+  number.** `"exp": "1790000000"`, `"exp": 0` and a fractional expiry were previously accepted by
+  numeric coercion and are now refused, and a JWT carrying no `exp` at all now ends the browser
+  session instead of leaving it signed in.
+
 ### Added
-- [#374](https://github.com/owncloud/openidconnect/pull/374) - feat: add the `audience` config key for the expected access token audience
+- [#374](https://github.com/owncloud/openidconnect/pull/374) - feat: add the `audience` config key
+  for the expected access token audience. Set it to the value the identity provider puts in `aud`.
+  It **replaces** the client-id in the expected set rather than adding to it, and switches the
+  `azp`/`appid`/`client_id` fallback off - so a token whose `aud` names the client-id and not the
+  configured audience is refused. An empty string or an empty array refuses every token.
 
 ### Fixed
 - [#374](https://github.com/owncloud/openidconnect/pull/374) - fix: do not fail with a server error when the token introspection response carries no expiry
 - [#374](https://github.com/owncloud/openidconnect/pull/374) - fix: only accept a token that labels itself an access token
 - [#374](https://github.com/owncloud/openidconnect/pull/374) - fix: accept an access token that names this client in azp, appid or client_id
-- [#365](https://github.com/owncloud/openidconnect/pull/365) - fix: verify token audience for introspected opaque tokens
 
 ## [2.4.1] - 2026-07-22
 
@@ -146,7 +180,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 - Initial Release
 
-[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.4.1..master
+[Unreleased]: https://github.com/owncloud/openidconnect/compare/v2.4.2..master
+[2.4.2]: https://github.com/owncloud/openidconnect/compare/v2.4.1..v2.4.2
 [2.4.1]: https://github.com/owncloud/openidconnect/compare/v2.4.0..v2.4.1
 [2.4.0]: https://github.com/owncloud/openidconnect/compare/v2.3.3..v2.4.0
 [2.3.3]: https://github.com/owncloud/openidconnect/compare/v2.3.2..v2.3.3
