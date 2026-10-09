@@ -21,6 +21,7 @@
  */
 namespace OCA\OpenIdConnect;
 
+use GuzzleHttp\Exception\ClientException;
 use Jumbojett\OpenIDConnectClientException;
 use OC\HintException;
 use OCP\ICache;
@@ -42,6 +43,8 @@ class SessionVerifier {
 	private $client;
 	/** @var IUserSession */
 	private $userSession;
+	/** @var callable|null */
+	private $logoutListener;
 
 	public function __construct(
 		Logger $logger,
@@ -87,9 +90,10 @@ class SessionVerifier {
 
 		// register logout handler
 		$client = $this->client;
-		$this->eventDispatcher->addListener('user.afterlogout', function () use ($accessToken, $idToken) {
+		$this->logoutListener = function () use ($accessToken, $idToken) {
 			$this->afterLogout($accessToken, $idToken);
-		});
+		};
+		$this->eventDispatcher->addListener('user.afterlogout', $this->logoutListener);
 
 		// cache access token information
 		$exp = $this->getCache()->get($accessToken);
@@ -149,9 +153,27 @@ class SessionVerifier {
 		if ($expiring < 5 * 60) {
 			$refreshToken = $this->session->get('oca.openid-connect.refresh-token');
 			if ($refreshToken) {
-				$response = $this->client->refreshToken($refreshToken);
+				try {
+					$response = $this->client->refreshToken($refreshToken);
+				} catch (\Exception $ex) {
+					if (!$ex instanceof ClientException) {
+						throw $ex;
+					}
+					$errorResponse = $ex->getResponse();
+					$error = \json_decode((string)$errorResponse->getBody(), true);
+					if ($errorResponse->getStatusCode() !== 400
+						|| !\is_array($error) || ($error['error'] ?? null) !== 'invalid_grant') {
+						throw $ex;
+					}
+					$this->logoutAfterRejectedRefresh();
+					return;
+				}
 				$this->logger->debug('RefreshToken response: ' . \json_encode($response, JSON_THROW_ON_ERROR));
 				if (\property_exists($response, 'error')) {
+					if ($response->error === 'invalid_grant') {
+						$this->logoutAfterRejectedRefresh();
+						return;
+					}
 					$this->logger->error('Refresh token failed: ' . \json_encode($response, JSON_THROW_ON_ERROR));
 					$this->logout();
 					throw new HintException("Verifying token failed: $response->error");
@@ -165,6 +187,14 @@ class SessionVerifier {
 				$this->logger->debug('No refresh token available -> nothing to do. We will be kicked out as soon as the access token expires.');
 			}
 		}
+	}
+
+	private function logoutAfterRejectedRefresh(): void {
+		$this->logger->error('OIDC refresh token rejected; ending the local session');
+		if ($this->logoutListener !== null) {
+			$this->eventDispatcher->removeListener('user.afterlogout', $this->logoutListener);
+		}
+		$this->logout();
 	}
 
 	private function logout(): void {
