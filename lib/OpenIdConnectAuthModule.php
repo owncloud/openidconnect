@@ -26,6 +26,7 @@ use Jumbojett\OpenIDConnectClientException;
 use OC\User\LoginException;
 use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
+use OCP\App\IAppManager;
 use OCP\Authentication\IAuthModule;
 use OCP\ICache;
 use OCP\ICacheFactory;
@@ -61,6 +62,8 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	private $lookupService;
 	/** @var AutoProvisioningService */
 	private $autoProvisioningService;
+	/** @var IAppManager */
+	private $appManager;
 	/**
 	 * Whether the expiry verifyToken() returned came out of the cache rather than from
 	 * an actual verification. See updateCache(): re-writing the entry on a cache hit
@@ -79,6 +82,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	 * @param UserLookupService $lookupService
 	 * @param Client $client
 	 * @param AutoProvisioningService $autoProvisioningService
+	 * @param IAppManager $appManager
 	 */
 	public function __construct(
 		IUserManager $manager,
@@ -86,7 +90,8 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		ICacheFactory $cacheFactory,
 		UserLookupService $lookupService,
 		Client $client,
-		AutoProvisioningService $autoProvisioningService
+		AutoProvisioningService $autoProvisioningService,
+		IAppManager $appManager
 	) {
 		$this->manager = $manager;
 		$this->logger = new Logger($logger);
@@ -94,6 +99,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 		$this->client = $client;
 		$this->lookupService = $lookupService;
 		$this->autoProvisioningService = $autoProvisioningService;
+		$this->appManager = $appManager;
 	}
 
 	/**
@@ -121,6 +127,10 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	 * @throws LoginException
 	 */
 	public function authToken(string $type, string $token): ?IUser {
+		if ($type === 'Bearer' && $this->appManager->isEnabledForUser('oauth2')
+			&& $this->isLocalOAuth2Token($token)) {
+			return null;
+		}
 		$this->logger->debug("OpenIdConnectAuthModule::authToken $type $token");
 		try {
 			if ($this->client->getOpenIdConfig() === null) {
@@ -154,6 +164,18 @@ class OpenIdConnectAuthModule implements IAuthModule {
 			$this->logger->logException($ex);
 			return null;
 		}
+	}
+
+	/**
+	 * @phan-suppress PhanUndeclaredClassReference
+	 * @phan-suppress PhanUndeclaredClassMethod
+	 */
+	protected function isLocalOAuth2Token(string $token): bool {
+		if (!\class_exists(\OCA\OAuth2\AuthModule::class)) {
+			return false;
+		}
+		$oauth2 = new \OCA\OAuth2\AuthModule();
+		return $oauth2->authToken($token) !== null;
 	}
 
 	/**
