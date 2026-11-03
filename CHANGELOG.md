@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] - XXXX-XX-XX
 
+### Fixed
+- Refresh browser-session access tokens only with less than 60 seconds remaining,
+  instead of less than five minutes, to avoid refreshing five-minute tokens on
+  every request.
+
 ## [2.4.2] - 2026-09-24
 
 ### Security

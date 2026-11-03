@@ -30,6 +30,7 @@ use OCA\OpenIdConnect\Client;
 use OCA\OpenIdConnect\OpenIdConnectAuthModule;
 use OCA\OpenIdConnect\Service\AutoProvisioningService;
 use OCA\OpenIdConnect\Service\UserLookupService;
+use OCP\App\IAppManager;
 use OCP\Http\Client\IClientService;
 use OCP\ICache;
 use OCP\ICacheFactory;
@@ -72,6 +73,8 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 	 * @var MockObject | IUserManager
 	 */
 	private $manager;
+	/** @var MockObject | IAppManager */
+	private $appManager;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -90,14 +93,48 @@ class OpenIdConnectAuthModuleTest extends TestCase {
 			->getMock();
 
 		$this->autoProvisioningService = $this->createMock(AutoProvisioningService::class);
+		$this->appManager = $this->createMock(IAppManager::class);
 		$this->authModule = new OpenIdConnectAuthModule(
 			$this->manager,
 			$this->logger,
 			$this->cacheFactory,
 			$this->lookupService,
 			$this->client,
-			$this->autoProvisioningService
+			$this->autoProvisioningService,
+			$this->appManager
 		);
+	}
+
+	public function localOAuth2Provider(): array {
+		return [
+			'valid local bearer' => ['Bearer', true, true, false],
+			'unknown bearer' => ['Bearer', true, false, true],
+			'disabled OAuth2' => ['Bearer', false, true, true],
+			'PoP is not local OAuth2' => ['PoP', true, true, true],
+		];
+	}
+
+	/**
+	 * @dataProvider localOAuth2Provider
+	 */
+	public function testLocalOAuth2Delegation(string $type, bool $enabled, bool $local, bool $introspect): void {
+		$this->appManager->method('isEnabledForUser')->with('oauth2')->willReturn($enabled);
+		$authModule = $this->getMockBuilder(OpenIdConnectAuthModule::class)
+			->setConstructorArgs([
+				$this->manager, $this->logger, $this->cacheFactory, $this->lookupService,
+				$this->client, $this->autoProvisioningService, $this->appManager,
+			])
+			->onlyMethods(['isLocalOAuth2Token'])->getMock();
+		$authModule->expects($type === 'Bearer' && $enabled ? self::once() : self::never())
+			->method('isLocalOAuth2Token')->with('opaque-token')->willReturn($local);
+		$this->client->expects($introspect ? self::atLeastOnce() : self::never())
+			->method('getOpenIdConfig')->willReturn(['client-id' => 'client-id']);
+		$this->client->expects($introspect ? self::once() : self::never())
+			->method('introspectToken')->with('opaque-token')->willReturn((object)['active' => false]);
+		$this->cacheFactory->method('create')->willReturn(new ArrayCache());
+		$this->lookupService->expects(self::never())->method('lookupUser');
+
+		self::assertNull($authModule->authToken($type, 'opaque-token'));
 	}
 
 	/**
