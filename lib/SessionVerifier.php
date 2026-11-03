@@ -142,6 +142,10 @@ class SessionVerifier {
 		return $this->cacheFactory->create('oca.openid-connect');
 	}
 
+	protected function getTime(): int {
+		return \time();
+	}
+
 	/**
 	 * @param int $exp
 	 * @throws OpenIDConnectClientException
@@ -149,8 +153,8 @@ class SessionVerifier {
 	 * @throws \JsonException
 	 */
 	private function refreshToken($exp): void {
-		$expiring = $exp - \time();
-		if ($expiring < 5 * 60) {
+		$expiring = $exp - $this->getTime();
+		if ($expiring < 60) {
 			$refreshToken = $this->session->get('oca.openid-connect.refresh-token');
 			if ($refreshToken) {
 				try {

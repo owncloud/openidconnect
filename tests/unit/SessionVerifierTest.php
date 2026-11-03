@@ -67,6 +67,8 @@ class SessionVerifierTest extends TestCase {
 	 * @var MockObject | Client
 	 */
 	private $client;
+	/** @var int */
+	private $now;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -84,7 +86,14 @@ class SessionVerifierTest extends TestCase {
 			->setConstructorArgs([$config, $generator, $this->session, $logger, $clientService])
 			->getMock();
 
-		$this->sessionVerifier = new SessionVerifier($logger, $this->session, $this->userSession, $this->cacheFactory, $dispatcher, $this->client);
+		$this->now = \time();
+		$this->sessionVerifier = $this->getMockBuilder(SessionVerifier::class)
+			->onlyMethods(['getTime'])
+			->setConstructorArgs([$logger, $this->session, $this->userSession, $this->cacheFactory, $dispatcher, $this->client])
+			->getMock();
+		$this->sessionVerifier->method('getTime')->willReturnCallback(function (): int {
+			return $this->now;
+		});
 	}
 
 	/**
@@ -261,6 +270,114 @@ class SessionVerifierTest extends TestCase {
 		];
 	}
 
+	public function refreshWindowProvider(): array {
+		$cases = [];
+		foreach (['cached', 'jwt', 'introspection'] as $source) {
+			foreach ([300, 299, 240, 61, 60, 59, 1, 0, -1] as $remaining) {
+				$cases["$source: $remaining seconds remaining"] = [$source, $remaining, $remaining < 60];
+			}
+		}
+		return $cases;
+	}
+
+	/**
+	 * @dataProvider refreshWindowProvider
+	 */
+	public function testRefreshWindow(string $source, int $remaining, bool $refresh): void {
+		$expiry = $this->now + $remaining;
+		$this->session->method('get')->willReturnMap([
+			['oca.openid-connect.session-id', null],
+			['oca.openid-connect.access-token', 'access-token'],
+			['oca.openid-connect.id-token', 'id-token'],
+			['oca.openid-connect.refresh-token', 'refresh-token'],
+		]);
+		$cache = $this->createMock(ICache::class);
+		$cache->expects(self::once())->method('get')->with('access-token')
+			->willReturn($source === 'cached' ? $expiry : null);
+		$cache->expects($source === 'cached' ? self::never() : self::once())
+			->method('set')->with('access-token', $expiry);
+		$this->cacheFactory->method('create')->willReturn($cache);
+		$this->client->method('getOpenIdConfig')->willReturn(['client-id' => 'client-id']);
+		$this->client->method('verifyJWTsignature')->willReturn($source === 'jwt');
+		$this->client->method('getAccessTokenPayload')
+			->willReturn($source === 'jwt' ? (object)['exp' => $expiry, 'aud' => 'client-id'] : null);
+		$this->client->expects($source === 'introspection' ? self::once() : self::never())
+			->method('introspectToken')->willReturn((object)['active' => true, 'exp' => $expiry, 'aud' => 'client-id']);
+		$this->client->expects($refresh ? self::once() : self::never())
+			->method('refreshToken')->with('refresh-token')->willReturn((object)[]);
+		$this->session->expects(self::exactly($refresh ? 2 : 0))->method('set');
+		$this->userSession->expects(self::never())->method('logout');
+
+		$this->sessionVerifier->verifySession();
+	}
+
+	public function testRepeatedRequestsDoNotImmediatelyRefreshRotatedTokens(): void {
+		$start = $this->now;
+		$session = [
+			'oca.openid-connect.access-token' => 'access-0',
+			'oca.openid-connect.refresh-token' => 'refresh-0',
+		];
+		$expiries = ['access-0' => $start + 300];
+		$cachedExpiries = [];
+		$refreshTimes = [];
+		$generation = 0;
+		$this->session->method('get')->willReturnCallback(static function (string $key) use (&$session) {
+			return $session[$key] ?? null;
+		});
+		$this->session->expects(self::exactly(4))->method('set')
+			->willReturnCallback(static function (string $key, $value) use (&$session): void {
+				$session[$key] = $value;
+			});
+		$cache = $this->createMock(ICache::class);
+		$cache->method('get')->willReturnCallback(static function (string $token) use (&$cachedExpiries) {
+			return $cachedExpiries[$token] ?? null;
+		});
+		$cache->expects(self::exactly(3))->method('set')
+			->willReturnCallback(static function (string $token, int $expiry) use (&$cachedExpiries): bool {
+				$cachedExpiries[$token] = $expiry;
+				return true;
+			});
+		$this->cacheFactory->method('create')->willReturn($cache);
+		$client = $this->createMock(Client::class);
+		$client->expects(self::exactly(3))->method('verifyToken')
+			->willReturnCallback(static function (string $token) use (&$expiries): int {
+				return $expiries[$token];
+			});
+		$client->expects(self::exactly(2))->method('refreshToken')
+			->willReturnCallback(function (string $token) use (&$generation, &$expiries, &$refreshTimes): object {
+				self::assertSame("refresh-$generation", $token);
+				$generation++;
+				$refreshTimes[] = $this->now;
+				$expiries["access-$generation"] = $this->now + 300;
+				return (object)['expires_in' => 300];
+			});
+		$client->method('getAccessToken')->willReturnCallback(static function () use (&$generation): string {
+			return "access-$generation";
+		});
+		$client->method('getRefreshToken')->willReturnCallback(static function () use (&$generation): string {
+			return "refresh-$generation";
+		});
+		$verifier = $this->getMockBuilder(SessionVerifier::class)
+			->onlyMethods(['getTime'])
+			->setConstructorArgs([
+				$this->createMock(Logger::class), $this->session, $this->userSession,
+				$this->cacheFactory, $this->createMock(EventDispatcherInterface::class), $client,
+			])->getMock();
+		$verifier->method('getTime')->willReturnCallback(function (): int {
+			return $this->now;
+		});
+		$this->userSession->expects(self::never())->method('logout');
+
+		for ($second = 0; $second < 600; $second++) {
+			$this->now = $start + $second;
+			$verifier->verifySession();
+		}
+
+		self::assertSame([$start + 241, $start + 482], $refreshTimes);
+		self::assertSame('access-2', $session['oca.openid-connect.access-token']);
+		self::assertSame('refresh-2', $session['oca.openid-connect.refresh-token']);
+	}
+
 	public function rejectedRefreshProvider(): array {
 		return [
 			'cached expiry, HTTP error' => [true, true],
@@ -287,7 +404,7 @@ class SessionVerifierTest extends TestCase {
 			$dispatcher,
 			$this->client
 		);
-		$expiry = \time() + 60;
+		$expiry = \time() + 30;
 		$this->session->method('get')->willReturnMap([
 			['oca.openid-connect.session-id', null],
 			['oca.openid-connect.access-token', 'access-token'],
@@ -351,7 +468,7 @@ class SessionVerifierTest extends TestCase {
 	 * @dataProvider otherRefreshFailuresProvider
 	 */
 	public function testOtherRefreshFailuresRemainErrors(bool $cached, \Exception $failure): void {
-		$expiry = \time() + 60;
+		$expiry = \time() + 30;
 		$this->session->method('get')->willReturnMap([
 			['oca.openid-connect.session-id', null],
 			['oca.openid-connect.access-token', 'access-token'],
