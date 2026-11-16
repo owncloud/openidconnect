@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] - XXXX-XX-XX
 
+### Fixed
+- End only the local session when the refresh token is rejected with `invalid_grant`,
+  instead of also sending a second, failing sign-out request to the identity provider.
+
 ## [2.4.2] - 2026-09-24
 
 ### Security
