@@ -102,7 +102,7 @@ class OpenIdConnectAuthModule implements IAuthModule {
 	 * @throws LoginException
 	 */
 	public function auth(IRequest $request): ?IUser {
-		$authHeader = $request->getHeader('Authorization');
+		$authHeader = $request->getHeader('Authorization') ?? '';
 
 		if (stripos($authHeader, 'bearer ') === 0) {
 			$bearerToken = \substr($authHeader, 7);
