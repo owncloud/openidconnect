@@ -72,6 +72,7 @@ class LoginFlowControllerLogoutTest extends TestCase {
 	/**
 	 * @var MockObject | AutoProvisioningService
 	 */
+	private $autoProvisioningService;
 
 	protected function setUp(): void {
 		parent::setUp();
